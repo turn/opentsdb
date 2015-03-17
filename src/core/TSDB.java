@@ -64,11 +64,11 @@ public final class TSDB {
   /** Charset used to convert Strings to byte arrays and back. */
   private static final Charset CHARSET = Charset.forName("ISO-8859-1");
   private static final String METRICS_QUAL = "metrics";
-  private static final short METRICS_WIDTH = 3;
+  private static final short METRICS_WIDTH = 4;
   private static final String TAG_NAME_QUAL = "tagk";
-  private static final short TAG_NAME_WIDTH = 3;
+  private static final short TAG_NAME_WIDTH = 4;
   private static final String TAG_VALUE_QUAL = "tagv";
-  private static final short TAG_VALUE_WIDTH = 3;
+  private static final short TAG_VALUE_WIDTH = 4;
 
   /** Client for the HBase cluster to use.  */
   final HBaseClient client;
