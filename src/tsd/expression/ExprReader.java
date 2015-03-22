@@ -25,6 +25,10 @@ public class ExprReader {
         return chars[mark++];
     }
 
+    public void skip(int num) {
+        mark+=num;
+    }
+
     public boolean isNextChar(char c) {
         return peek() == c;
     }
@@ -32,12 +36,21 @@ public class ExprReader {
     public boolean isNextSeq(CharSequence seq) {
         Preconditions.checkNotNull(seq);
         for (int i=0; i<seq.length(); i++) {
+            if (mark+i == chars.length) return false;
             if (chars[mark+i] != seq.charAt(i)) {
                 return false;
             }
         }
 
         return true;
+    }
+
+    public String readFuncName() {
+        StringBuilder builder = new StringBuilder();
+        while (peek() != '(' && !Character.isWhitespace(peek())) {
+            builder.append(next());
+        }
+        return builder.toString();
     }
 
     public boolean isEOF() {
@@ -54,4 +67,32 @@ public class ExprReader {
         }
     }
 
+    public String readNextParameter() {
+        StringBuilder builder = new StringBuilder();
+        int numNested = 0;
+        while (!Character.isWhitespace(peek()) && !isNextSeq(",,")) {
+            char ch = peek();
+            if (ch == '(') numNested++;
+            else if (ch == ')') numNested--;
+            if (numNested < 0) {
+                break;
+            }
+            builder.append(next());
+        }
+        return builder.toString();
+    }
+
+    public String readParameters() {
+        StringBuilder builder = new StringBuilder();
+        while (peek() != ')') {
+            builder.append(next());
+        }
+        return builder.toString();
+    }
+
+    @Override
+    public String toString() {
+        // make a copy
+        return new String(chars);
+    }
 }
