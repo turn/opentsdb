@@ -4,8 +4,8 @@ import net.opentsdb.core.DataPoints;
 
 import java.util.List;
 
-public abstract class Expression {
+public interface Expression {
 
-    public abstract DataPoints[] evaluate(List<DataPoints[]> queryResults);
+    DataPoints[] evaluate(List<DataPoints[]> queryResults);
 
 }

@@ -20,6 +20,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.google.common.collect.Lists;
+import net.opentsdb.tsd.expression.ExpressionTree;
+import net.opentsdb.tsd.expression.Expressions;
 import org.hbase.async.Bytes.ByteMap;
 import org.jboss.netty.handler.codec.http.HttpMethod;
 import org.jboss.netty.handler.codec.http.HttpResponseStatus;
@@ -369,6 +372,15 @@ final class QueryRpc implements HttpRpc {
         this.parseTsuidTypeSubQuery(q, data_query);
       }
     }
+
+      if (query.hasQueryStringParam("expr")) {
+          final List<String> exprs = query.getQueryStringParams("expr");
+          List<String> metricQueries = new ArrayList<String>();
+          this.prepareExpressions(exprs, data_query, metricQueries);
+          for (String mq: metricQueries) {
+              this.parseMTypeSubQuery(mq, data_query);
+          }
+      }
     
     if (query.hasQueryStringParam("m")) {
       final List<String> legacy_queries = query.getQueryStringParams("m");      
@@ -382,6 +394,17 @@ final class QueryRpc implements HttpRpc {
     }
     return data_query;
   }
+
+    private void prepareExpressions(List<String> exprs, TSQuery data_query,
+                                    List<String> metricQueries) {
+        for (String expr: exprs) {
+            ExpressionTree tree = Expressions.parse(expr, metricQueries);
+            if (data_query.getExpressionTrees() == null) {
+                data_query.setExpressionTrees(new ArrayList<ExpressionTree>());
+            }
+            data_query.getExpressionTrees().add(tree);
+        }
+    }
   
   /**
    * Parses a query string "m=..." type query and adds it to the TSQuery.

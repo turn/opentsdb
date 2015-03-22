@@ -46,7 +46,7 @@ public class ExpressionTreeTest {
         System.out.println(metricQueries);
     }
 
-    static class FooExpression extends Expression {
+    static class FooExpression implements Expression {
         @Override
         public DataPoints[] evaluate(List<DataPoints[]> queryResults) {
             return new DataPoints[0];

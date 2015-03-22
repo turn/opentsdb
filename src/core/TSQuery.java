@@ -17,6 +17,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import net.opentsdb.tsd.expression.ExpressionTree;
 import net.opentsdb.utils.DateTime;
 
 /**
@@ -63,6 +64,9 @@ public final class TSQuery {
   
   /** A list of parsed sub queries, must have one or more to fetch data */
   private ArrayList<TSSubQuery> queries;
+
+    /** A list of Expression Trees associated with this query */
+    private ArrayList<ExpressionTree> expressionTrees;
 
   /** The parsed start time value 
    * <b>Do not set directly</b> */
@@ -266,6 +270,10 @@ public final class TSQuery {
     return queries;
   }
 
+    public List<ExpressionTree> getExpressionTrees() {
+        return expressionTrees;
+    }
+
   /** @return whether or not the requestor wants millisecond resolution */
   public boolean getMsResolution() {
     return ms_resolution;
@@ -325,8 +333,13 @@ public final class TSQuery {
     this.queries = queries;
   }
 
+  public void setExpressionTrees(ArrayList<ExpressionTree> expressionTrees) {
+    this.expressionTrees = expressionTrees;
+  }
+
   /** @param ms_resolution whether or not the user wants millisecond resolution */
   public void setMsResolution(boolean ms_resolution) {
     this.ms_resolution = ms_resolution;
   }
+
 }
