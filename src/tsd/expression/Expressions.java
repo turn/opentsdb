@@ -41,10 +41,11 @@ public class Expressions {
     private static void parse(ExprReader reader, List<String> metricQueries,
                               ExpressionTree root) {
 
+        int parameterIndex = 0;
         reader.skipWhitespaces();
         if (reader.peek() != ')') {
             String param = reader.readNextParameter();
-            parseParam(param, metricQueries, root);
+            parseParam(param, metricQueries, root, parameterIndex++);
         }
 
         while (true) {
@@ -55,7 +56,7 @@ public class Expressions {
                 reader.skip(2); //swallow the ",," delimiter
                 reader.skipWhitespaces();
                 String param = reader.readNextParameter();
-                parseParam(param, metricQueries, root);
+                parseParam(param, metricQueries, root, parameterIndex++);
             } else {
                 throw new RuntimeException("Invalid delimiter in parameter " +
                         "list at pos=" + reader.getMark() + ", expr="
@@ -65,7 +66,7 @@ public class Expressions {
     }
 
     private static void parseParam(String param, List<String> metricQueries,
-                                   ExpressionTree root) {
+                                   ExpressionTree root, int index) {
         if (param == null || param.length() == 0) {
             throw new RuntimeException("Invalid Parameter in " +
                     "Expression");
@@ -74,11 +75,11 @@ public class Expressions {
         if (param.indexOf('(') > 0 && param.indexOf(')') > 0) {
             // sub expression
             ExpressionTree subTree = parse(param, metricQueries);
-            root.addSubExpression(subTree);
+            root.addSubExpression(subTree, index);
         } else if (param.indexOf(':') >= 0) {
             // metric query
             metricQueries.add(param);
-            root.addSubMetricQuery(param, metricQueries.size());
+            root.addSubMetricQuery(param, metricQueries.size() - 1, index);
         } else {
             // expression parameter
             root.addFunctionParameter(param);

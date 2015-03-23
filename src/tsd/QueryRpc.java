@@ -24,6 +24,7 @@ import com.google.common.collect.Lists;
 import net.opentsdb.tsd.expression.ExpressionTree;
 import net.opentsdb.tsd.expression.Expressions;
 import org.hbase.async.Bytes.ByteMap;
+import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.handler.codec.http.HttpMethod;
 import org.jboss.netty.handler.codec.http.HttpResponseStatus;
 import org.slf4j.Logger;
@@ -156,13 +157,29 @@ final class QueryRpc implements HttpRpc {
         throw new RuntimeException("Shouldn't be here", e);
       }
     }
-    
+
     try {
       Deferred.groupInOrder(deferreds).addCallback(new QueriesCB())
         .joinUninterruptibly();
     } catch (Exception e) {
       throw new RuntimeException("Shouldn't be here", e);
     }
+
+      List<ExpressionTree> exprs = data_query.getExpressionTrees();
+      List<DataPoints[]> exprResults = Lists.newArrayList();
+      if (exprs != null && exprs.size() > 0) {
+          for (ExpressionTree tree: exprs) {
+              try {
+                  exprResults.add(tree.evaluate(results));
+              } catch (Exception e) {
+                  LOG.error("Error evaluating expression", e);
+              }
+          }
+
+          ChannelBuffer buff = query.serializer().formatQueryV1(data_query,
+                  exprResults, globals);
+          LOG.info(new String(buff.array()));
+      }
     
     switch (query.apiVersion()) {
     case 0:
