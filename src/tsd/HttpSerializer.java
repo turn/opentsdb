@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 
+import net.opentsdb.tsd.expression.ExpressionTree;
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.buffer.ChannelBuffers;
 import org.jboss.netty.handler.codec.http.HttpResponseStatus;
@@ -89,14 +90,14 @@ import net.opentsdb.utils.Config;
 public abstract class HttpSerializer {
   /** Content type to use for matching a serializer to incoming requests */
   protected String request_content_type = "application/json";
-  
+
   /** Content type to return with data from this serializer */
   protected String response_content_type = "application/json; charset=UTF-8";
-  
+
   /** The query used for accessing the DefaultHttpResponse object and other 
    * information */
   protected final HttpQuery query;
-  
+
   /**
    * Empty constructor required for plugin operation
    */
@@ -118,7 +119,7 @@ public abstract class HttpSerializer {
   public HttpSerializer(final HttpQuery query) {
     this.query = query;
   }
-  
+
   /**
    * Initializer called one time when the TSD starts up and loads serializer 
    * plugins. You should use this method to setup static, thread-safe objects
@@ -127,22 +128,22 @@ public abstract class HttpSerializer {
    * if require.
    */
   public abstract void initialize(final TSDB tsdb);
-  
+
   /**
    * Called when the TSD is shutting down so implementations can gracefully 
    * close their objects or connections if necessary
    * @return An object, usually a Boolean, used to wait on during shutdown
    */
   public abstract Deferred<Object> shutdown();
-  
-  /** 
+
+  /**
    * The version of this serializer plugin in the format "MAJOR.MINOR.MAINT"
    * The MAJOR version should match the major version of OpenTSDB, e.g. if the
    * plugin is associated with 2.0.1, your version should be 2.x.x. 
    * @return the version as a String
    */
   public abstract String version();
-  
+
   /**
    * The simple name for this serializer referenced by users.
    * The name should be lower case, all one word without any odd characters
@@ -155,144 +156,144 @@ public abstract class HttpSerializer {
   public String requestContentType() {
     return this.request_content_type;
   }
-  
+
   /** @return the outgoing content type */
   public String responseContentType() {
     return this.response_content_type;
   }
-  
+
   /**
    * Parses one or more data points for storage
    * @return an array of data points to process for storage
    * @throws BadRequestException if the plugin has not implemented this method
    */
   public List<IncomingDataPoint> parsePutV1() {
-    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED, 
-        "The requested API endpoint has not been implemented", 
-        this.getClass().getCanonicalName() + 
+    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED,
+        "The requested API endpoint has not been implemented",
+        this.getClass().getCanonicalName() +
         " has not implemented parsePutV1");
   }
-  
+
   /**
    * Parses a suggestion query
    * @return a hash map of key/value pairs
    * @throws BadRequestException if the plugin has not implemented this method
    */
   public HashMap<String, String> parseSuggestV1() {
-    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED, 
-        "The requested API endpoint has not been implemented", 
-        this.getClass().getCanonicalName() + 
+    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED,
+        "The requested API endpoint has not been implemented",
+        this.getClass().getCanonicalName() +
         " has not implemented parseSuggestV1");
   }
-  
+
   /**
    * Parses a list of metrics, tagk and/or tagvs to assign UIDs to
    * @return as hash map of lists for the different types
    * @throws BadRequestException if the plugin has not implemented this method
    */
   public HashMap<String, List<String>> parseUidAssignV1() {
-    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED, 
-        "The requested API endpoint has not been implemented", 
-        this.getClass().getCanonicalName() + 
+    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED,
+        "The requested API endpoint has not been implemented",
+        this.getClass().getCanonicalName() +
         " has not implemented parseUidAssignV1");
   }
-  
+
   /**
    * Parses a SearchQuery request
    * @return The parsed search query
    * @throws BadRequestException if the plugin has not implemented this method
    */
   public SearchQuery parseSearchQueryV1() {
-    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED, 
-        "The requested API endpoint has not been implemented", 
-        this.getClass().getCanonicalName() + 
+    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED,
+        "The requested API endpoint has not been implemented",
+        this.getClass().getCanonicalName() +
         " has not implemented parseSearchQueryV1");
   }
-  
+
   /**
    * Parses a timeseries data query
    * @return A TSQuery with data ready to validate
    * @throws BadRequestException if the plugin has not implemented this method
    */
   public TSQuery parseQueryV1() {
-    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED, 
-        "The requested API endpoint has not been implemented", 
-        this.getClass().getCanonicalName() + 
+    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED,
+        "The requested API endpoint has not been implemented",
+        this.getClass().getCanonicalName() +
         " has not implemented parseQueryV1");
   }
-  
+
   /**
    * Parses a last data point query
    * @return A LastPointQuery to work with
    * @throws BadRequestException if the plugin has not implemented this method
    */
   public LastPointQuery parseLastPointQueryV1() {
-    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED, 
-        "The requested API endpoint has not been implemented", 
-        this.getClass().getCanonicalName() + 
+    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED,
+        "The requested API endpoint has not been implemented",
+        this.getClass().getCanonicalName() +
         " has not implemented parseLastPointQueryV1");
   }
-  
+
   /**
    * Parses a single UIDMeta object
    * @return the parsed meta data object
    * @throws BadRequestException if the plugin has not implemented this method
    */
   public UIDMeta parseUidMetaV1() {
-    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED, 
-        "The requested API endpoint has not been implemented", 
-        this.getClass().getCanonicalName() + 
+    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED,
+        "The requested API endpoint has not been implemented",
+        this.getClass().getCanonicalName() +
         " has not implemented parseUidMetaV1");
   }
-  
+
   /**
    * Parses a single TSMeta object
    * @return the parsed meta data object
    * @throws BadRequestException if the plugin has not implemented this method
    */
   public TSMeta parseTSMetaV1() {
-    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED, 
-        "The requested API endpoint has not been implemented", 
-        this.getClass().getCanonicalName() + 
+    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED,
+        "The requested API endpoint has not been implemented",
+        this.getClass().getCanonicalName() +
         " has not implemented parseTSMetaV1");
   }
-  
+
   /**
    * Parses a single Tree object
    * @return the parsed tree object
    * @throws BadRequestException if the plugin has not implemented this method
    */
   public Tree parseTreeV1() {
-    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED, 
-        "The requested API endpoint has not been implemented", 
-        this.getClass().getCanonicalName() + 
+    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED,
+        "The requested API endpoint has not been implemented",
+        this.getClass().getCanonicalName() +
         " has not implemented parseTreeV1");
   }
-  
+
   /**
    * Parses a single TreeRule object
    * @return the parsed rule object
    * @throws BadRequestException if the plugin has not implemented this method
    */
   public TreeRule parseTreeRuleV1() {
-    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED, 
-        "The requested API endpoint has not been implemented", 
-        this.getClass().getCanonicalName() + 
+    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED,
+        "The requested API endpoint has not been implemented",
+        this.getClass().getCanonicalName() +
         " has not implemented parseTreeRuleV1");
   }
-  
+
   /**
    * Parses one or more tree rules
    * @return A list of one or more rules
    * @throws BadRequestException if the plugin has not implemented this method
    */
   public List<TreeRule> parseTreeRulesV1() {
-    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED, 
-        "The requested API endpoint has not been implemented", 
-        this.getClass().getCanonicalName() + 
+    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED,
+        "The requested API endpoint has not been implemented",
+        this.getClass().getCanonicalName() +
         " has not implemented parseTreeRulesV1");
   }
-  
+
   /**
    * Parses a tree ID and optional list of TSUIDs to search for collisions or
    * not matched TSUIDs.
@@ -301,48 +302,48 @@ public abstract class HttpSerializer {
    * @throws BadRequestException if the plugin has not implemented this method
    */
   public Map<String, Object> parseTreeTSUIDsListV1() {
-    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED, 
-        "The requested API endpoint has not been implemented", 
-        this.getClass().getCanonicalName() + 
+    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED,
+        "The requested API endpoint has not been implemented",
+        this.getClass().getCanonicalName() +
         " has not implemented parseTreeCollisionNotMatchedV1");
   }
-  
+
   /**
    * Parses an annotation object
    * @return An annotation object
    * @throws BadRequestException if the plugin has not implemented this method
    */
   public Annotation parseAnnotationV1() {
-    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED, 
-        "The requested API endpoint has not been implemented", 
-        this.getClass().getCanonicalName() + 
+    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED,
+        "The requested API endpoint has not been implemented",
+        this.getClass().getCanonicalName() +
         " has not implemented parseAnnotationV1");
   }
-  
+
   /**
    * Parses a list of annotation objects
    * @return A list of annotation object
    * @throws BadRequestException if the plugin has not implemented this method
    */
   public List<Annotation> parseAnnotationsV1() {
-    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED, 
-        "The requested API endpoint has not been implemented", 
-        this.getClass().getCanonicalName() + 
+    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED,
+        "The requested API endpoint has not been implemented",
+        this.getClass().getCanonicalName() +
         " has not implemented parseAnnotationsV1");
   }
-  
+
   /**
    * Parses a bulk annotation deletion query object
    * @return Settings used to bulk delete annotations
    * @throws BadRequestException if the plugin has not implemented this method
    */
   public AnnotationBulkDelete parseAnnotationBulkDeleteV1() {
-    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED, 
-        "The requested API endpoint has not been implemented", 
-        this.getClass().getCanonicalName() + 
+    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED,
+        "The requested API endpoint has not been implemented",
+        this.getClass().getCanonicalName() +
         " has not implemented parseAnnotationBulkDeleteV1");
   }
-  
+
   /**
    * Formats the results of an HTTP data point storage request
    * @param results A map of results. The map will consist of:
@@ -357,12 +358,12 @@ public abstract class HttpSerializer {
    * @throws BadRequestException if the plugin has not implemented this method
    */
   public ChannelBuffer formatPutV1(final Map<String, Object> results) {
-    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED, 
-        "The requested API endpoint has not been implemented", 
-        this.getClass().getCanonicalName() + 
+    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED,
+        "The requested API endpoint has not been implemented",
+        this.getClass().getCanonicalName() +
         " has not implemented formatPutV1");
   }
-  
+
   /**
    * Formats a suggestion response
    * @param suggestions List of suggestions for the given type
@@ -370,9 +371,9 @@ public abstract class HttpSerializer {
    * @throws BadRequestException if the plugin has not implemented this method
    */
   public ChannelBuffer formatSuggestV1(final List<String> suggestions) {
-    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED, 
-        "The requested API endpoint has not been implemented", 
-        this.getClass().getCanonicalName() + 
+    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED,
+        "The requested API endpoint has not been implemented",
+        this.getClass().getCanonicalName() +
         " has not implemented formatSuggestV1");
   }
 
@@ -382,12 +383,12 @@ public abstract class HttpSerializer {
    * @throws BadRequestException if the plugin has not implemented this method
    */
   public ChannelBuffer formatSerializersV1() {
-    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED, 
-        "The requested API endpoint has not been implemented", 
-        this.getClass().getCanonicalName() + 
+    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED,
+        "The requested API endpoint has not been implemented",
+        this.getClass().getCanonicalName() +
         " has not implemented formatSerializersV1");
   }
-  
+
   /**
    * Format the list of implemented aggregators
    * @param aggregators The list of aggregation functions
@@ -395,12 +396,12 @@ public abstract class HttpSerializer {
    * @throws BadRequestException if the plugin has not implemented this method
    */
   public ChannelBuffer formatAggregatorsV1(final Set<String> aggregators) {
-    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED, 
-        "The requested API endpoint has not been implemented", 
-        this.getClass().getCanonicalName() + 
+    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED,
+        "The requested API endpoint has not been implemented",
+        this.getClass().getCanonicalName() +
         " has not implemented formatAggregatorsV1");
   }
-  
+
   /**
    * Format a hash map of information about the OpenTSDB version
    * @param version A hash map with version information
@@ -408,12 +409,12 @@ public abstract class HttpSerializer {
    * @throws BadRequestException if the plugin has not implemented this method
    */
   public ChannelBuffer formatVersionV1(final Map<String, String> version) {
-    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED, 
-        "The requested API endpoint has not been implemented", 
-        this.getClass().getCanonicalName() + 
+    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED,
+        "The requested API endpoint has not been implemented",
+        this.getClass().getCanonicalName() +
         " has not implemented formatVersionV1");
   }
-  
+
   /**
    * Format a response from the DropCaches call
    * @param response A hash map with a response
@@ -421,12 +422,12 @@ public abstract class HttpSerializer {
    * @throws BadRequestException if the plugin has not implemented this method
    */
   public ChannelBuffer formatDropCachesV1(final Map<String, String> response) {
-    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED, 
-        "The requested API endpoint has not been implemented", 
-        this.getClass().getCanonicalName() + 
+    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED,
+        "The requested API endpoint has not been implemented",
+        this.getClass().getCanonicalName() +
         " has not implemented formatDropCachesV1");
   }
-  
+
   /**
    * Format a response from the Uid Assignment RPC
    * @param response A map of lists of pairs representing the results of the
@@ -434,14 +435,14 @@ public abstract class HttpSerializer {
    * @return A ChannelBuffer object to pass on to the caller
    * @throws BadRequestException if the plugin has not implemented this method
    */
-  public ChannelBuffer formatUidAssignV1(final 
+  public ChannelBuffer formatUidAssignV1(final
       Map<String, TreeMap<String, String>> response) {
-    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED, 
-        "The requested API endpoint has not been implemented", 
-        this.getClass().getCanonicalName() + 
+    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED,
+        "The requested API endpoint has not been implemented",
+        this.getClass().getCanonicalName() +
         " has not implemented formatUidAssignV1");
   }
-  
+
   /**
    * Format the results from a timeseries data query
    * @param query The TSQuery object used to fetch the results
@@ -450,14 +451,24 @@ public abstract class HttpSerializer {
    * @return A ChannelBuffer object to pass on to the caller
    * @throws BadRequestException if the plugin has not implemented this method
    */
-  public ChannelBuffer formatQueryV1(final TSQuery query, 
+  public ChannelBuffer formatQueryV1(final TSQuery query,
       final List<DataPoints[]> results, final List<Annotation> globals) {
-    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED, 
-        "The requested API endpoint has not been implemented", 
-        this.getClass().getCanonicalName() + 
+    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED,
+        "The requested API endpoint has not been implemented",
+        this.getClass().getCanonicalName() +
         " has not implemented formatQueryV1");
   }
-  
+
+  public ChannelBuffer formatQueryV1(final TSQuery data_query,
+                                     final List<DataPoints[]> results,
+                                     final List<Annotation> globals,
+                                     final List<ExpressionTree> expressions) {
+    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED,
+            "The requested API endpoint has not been implemented",
+            this.getClass().getCanonicalName() +
+            " has not implemented formatQueryV1");
+  }
+
   /**
    * Format a list of last data points
    * @param data_points The results of the query
@@ -466,12 +477,12 @@ public abstract class HttpSerializer {
    */
   public ChannelBuffer formatLastPointQueryV1(
       final List<IncomingDataPoint> data_points) {
-    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED, 
-        "The requested API endpoint has not been implemented", 
-        this.getClass().getCanonicalName() + 
+    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED,
+        "The requested API endpoint has not been implemented",
+        this.getClass().getCanonicalName() +
         " has not implemented formatLastPointQueryV1");
   }
-  
+
   /**
    * Format a single UIDMeta object
    * @param meta The UIDMeta object to serialize
@@ -479,12 +490,12 @@ public abstract class HttpSerializer {
    * @throws BadRequestException if the plugin has not implemented this method
    */
   public ChannelBuffer formatUidMetaV1(final UIDMeta meta) {
-    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED, 
-        "The requested API endpoint has not been implemented", 
-        this.getClass().getCanonicalName() + 
+    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED,
+        "The requested API endpoint has not been implemented",
+        this.getClass().getCanonicalName() +
         " has not implemented formatUidMetaV1");
   }
-  
+
   /**
    * Format a single TSMeta object
    * @param meta The TSMeta object to serialize
@@ -492,12 +503,12 @@ public abstract class HttpSerializer {
    * @throws BadRequestException if the plugin has not implemented this method
    */
   public ChannelBuffer formatTSMetaV1(final TSMeta meta) {
-    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED, 
-        "The requested API endpoint has not been implemented", 
-        this.getClass().getCanonicalName() + 
+    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED,
+        "The requested API endpoint has not been implemented",
+        this.getClass().getCanonicalName() +
         " has not implemented formatTSMetaV1");
   }
-  
+
   /**
    * Format a a list of TSMeta objects
    * @param meta The list of TSMeta objects to serialize
@@ -505,12 +516,12 @@ public abstract class HttpSerializer {
    * @throws JSONException if serialization failed
    */
   public ChannelBuffer formatTSMetaListV1(final List<TSMeta> metas) {
-    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED, 
-        "The requested API endpoint has not been implemented", 
-        this.getClass().getCanonicalName() + 
+    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED,
+        "The requested API endpoint has not been implemented",
+        this.getClass().getCanonicalName() +
         " has not implemented formatTSMetaV1");
   }
-  
+
   /**
    * Format a single Branch object
    * @param branch The branch to serialize
@@ -518,12 +529,12 @@ public abstract class HttpSerializer {
    * @throws BadRequestException if the plugin has not implemented this method
    */
   public ChannelBuffer formatBranchV1(final Branch branch) {
-    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED, 
-        "The requested API endpoint has not been implemented", 
-        this.getClass().getCanonicalName() + 
+    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED,
+        "The requested API endpoint has not been implemented",
+        this.getClass().getCanonicalName() +
         " has not implemented formatBranchV1");
   }
-  
+
   /**
    * Format a single tree object
    * @param tree tree to serialize
@@ -531,12 +542,12 @@ public abstract class HttpSerializer {
    * @throws BadRequestException if the plugin has not implemented this method
    */
   public ChannelBuffer formatTreeV1(final Tree tree) {
-    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED, 
-        "The requested API endpoint has not been implemented", 
-        this.getClass().getCanonicalName() + 
+    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED,
+        "The requested API endpoint has not been implemented",
+        this.getClass().getCanonicalName() +
         " has not implemented formatTreeV1");
   }
-  
+
   /**
    * Format a list of tree objects. Note that the list may be empty if no trees
    * were present.
@@ -545,12 +556,12 @@ public abstract class HttpSerializer {
    * @throws BadRequestException if the plugin has not implemented this method
    */
   public ChannelBuffer formatTreesV1(final List<Tree> trees) {
-    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED, 
-        "The requested API endpoint has not been implemented", 
-        this.getClass().getCanonicalName() + 
+    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED,
+        "The requested API endpoint has not been implemented",
+        this.getClass().getCanonicalName() +
         " has not implemented formatTreesV1");
   }
-  
+
   /**
    * Format a single TreeRule object
    * @param rule The rule to serialize
@@ -558,12 +569,12 @@ public abstract class HttpSerializer {
    * @throws BadRequestException if the plugin has not implemented this method
    */
   public ChannelBuffer formatTreeRuleV1(final TreeRule rule) {
-    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED, 
-        "The requested API endpoint has not been implemented", 
-        this.getClass().getCanonicalName() + 
+    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED,
+        "The requested API endpoint has not been implemented",
+        this.getClass().getCanonicalName() +
         " has not implemented formatTreeRuleV1");
   }
-  
+
   /**
    * Format a map of one or more TSUIDs that collided or were not matched
    * @param results The list of results. Collisions: key = tsuid, value = 
@@ -576,12 +587,12 @@ public abstract class HttpSerializer {
    */
   public ChannelBuffer formatTreeCollisionNotMatchedV1(
       final Map<String, String> results, final boolean is_collisions) {
-    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED, 
-        "The requested API endpoint has not been implemented", 
-        this.getClass().getCanonicalName() + 
+    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED,
+        "The requested API endpoint has not been implemented",
+        this.getClass().getCanonicalName() +
         " has not implemented formatTreeCollisionNotMatched");
   }
-  
+
   /**
    * Format the results of testing one or more TSUIDs through a tree's ruleset
    * @param results The list of results. Main map key is the tsuid. Child map:
@@ -591,14 +602,14 @@ public abstract class HttpSerializer {
    * @return A ChannelBuffer object to pass on to the caller
    * @throws BadRequestException if the plugin has not implemented this method
    */
-  public ChannelBuffer formatTreeTestV1(final 
+  public ChannelBuffer formatTreeTestV1(final
       HashMap<String, HashMap<String, Object>> results) {
-    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED, 
-        "The requested API endpoint has not been implemented", 
-        this.getClass().getCanonicalName() + 
+    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED,
+        "The requested API endpoint has not been implemented",
+        this.getClass().getCanonicalName() +
         " has not implemented formatTreeTestV1");
   }
-  
+
   /**
    * Format an annotation object
    * @param note The annotation object to format
@@ -606,12 +617,12 @@ public abstract class HttpSerializer {
    * @throws BadRequestException if the plugin has not implemented this method
    */
   public ChannelBuffer formatAnnotationV1(final Annotation note) {
-    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED, 
-        "The requested API endpoint has not been implemented", 
-        this.getClass().getCanonicalName() + 
+    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED,
+        "The requested API endpoint has not been implemented",
+        this.getClass().getCanonicalName() +
         " has not implemented formatAnnotationV1");
   }
-  
+
   /**
    * Format a list of annotation objects
    * @param notes The annotation objects to format
@@ -619,12 +630,12 @@ public abstract class HttpSerializer {
    * @throws BadRequestException if the plugin has not implemented this method
    */
   public ChannelBuffer formatAnnotationsV1(final List<Annotation> notes) {
-    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED, 
-        "The requested API endpoint has not been implemented", 
-        this.getClass().getCanonicalName() + 
+    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED,
+        "The requested API endpoint has not been implemented",
+        this.getClass().getCanonicalName() +
         " has not implemented formatAnnotationsV1");
   }
-  
+
   /**
    * Format the results of a bulk annotation deletion
    * @param notes The annotation deletion request to return
@@ -633,9 +644,9 @@ public abstract class HttpSerializer {
    */
   public ChannelBuffer formatAnnotationBulkDeleteV1(
       final AnnotationBulkDelete request) {
-    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED, 
-        "The requested API endpoint has not been implemented", 
-        this.getClass().getCanonicalName() + 
+    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED,
+        "The requested API endpoint has not been implemented",
+        this.getClass().getCanonicalName() +
         " has not implemented formatAnnotationBulkDeleteV1");
   }
 
@@ -646,12 +657,12 @@ public abstract class HttpSerializer {
    * @throws BadRequestException if the plugin has not implemented this method
    */
   public ChannelBuffer formatStatsV1(final List<IncomingDataPoint> stats) {
-    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED, 
-        "The requested API endpoint has not been implemented", 
-        this.getClass().getCanonicalName() + 
+    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED,
+        "The requested API endpoint has not been implemented",
+        this.getClass().getCanonicalName() +
         " has not implemented formatStatsV1");
   }
-  
+
   /**
    * Format the response from a search query
    * @param results The query (hopefully filled with results) to serialize
@@ -659,12 +670,12 @@ public abstract class HttpSerializer {
    * @throws BadRequestException if the plugin has not implemented this method
    */
   public ChannelBuffer formatSearchResultsV1(final SearchQuery results) {
-    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED, 
-        "The requested API endpoint has not been implemented", 
-        this.getClass().getCanonicalName() + 
+    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED,
+        "The requested API endpoint has not been implemented",
+        this.getClass().getCanonicalName() +
         " has not implemented formatSearchResultsV1");
   }
-  
+
   /**
    * Format the running configuration
    * @param config The running config to serialize
@@ -672,12 +683,12 @@ public abstract class HttpSerializer {
    * @throws BadRequestException if the plugin has not implemented this method
    */
   public ChannelBuffer formatConfigV1(final Config config) {
-    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED, 
-        "The requested API endpoint has not been implemented", 
-        this.getClass().getCanonicalName() + 
+    throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED,
+        "The requested API endpoint has not been implemented",
+        this.getClass().getCanonicalName() +
         " has not implemented formatConfigV1");
   }
-  
+
   /**
    * Formats a 404 error when an endpoint or file wasn't found
    * <p>
@@ -686,7 +697,7 @@ public abstract class HttpSerializer {
    * @return A standard JSON error
    */
   public ChannelBuffer formatNotFoundV1() {
-    StringBuilder output = 
+    StringBuilder output =
       new StringBuilder(1024);
     if (query.hasQueryStringParam("jsonp")) {
       output.append(query.getQueryStringParam("jsonp") + "(");
@@ -706,7 +717,7 @@ public abstract class HttpSerializer {
     return ChannelBuffers.copiedBuffer(
         output.toString().getBytes(this.query.getCharset()));
   }
-  
+
   /**
    * Format a bad request exception, indicating an invalid request from the
    * user
@@ -717,7 +728,7 @@ public abstract class HttpSerializer {
    * @return A standard JSON error
    */
   public ChannelBuffer formatErrorV1(final BadRequestException exception) {
-    StringBuilder output = 
+    StringBuilder output =
       new StringBuilder(exception.getMessage().length() * 2);
     final String jsonp = query.getQueryStringParam("jsonp");
     if (jsonp != null && !jsonp.isEmpty()) {
@@ -749,7 +760,7 @@ public abstract class HttpSerializer {
     return ChannelBuffers.copiedBuffer(
         output.toString().getBytes(this.query.getCharset()));
   }
-  
+
   /**
    * Format an internal error exception that was caused by the system
    * Should return a 500 error
@@ -767,7 +778,7 @@ public abstract class HttpSerializer {
     } else if (message == null) {
       message = "An unknown exception occurred";
     }
-    StringBuilder output = 
+    StringBuilder output =
       new StringBuilder(message.length() * 2);
     final String jsonp = query.getQueryStringParam("jsonp");
     if (jsonp != null && !jsonp.isEmpty()) {

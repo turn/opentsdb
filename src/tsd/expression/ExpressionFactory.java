@@ -9,27 +9,33 @@ import java.util.Map;
 
 public class ExpressionFactory {
 
-    private static Map<String, Expression> availableFunctions =
-            Maps.newHashMap();
+  private static Map<String, Expression> availableFunctions =
+          Maps.newHashMap();
 
-    static {
-        availableFunctions.put("id", new IdentityExpression());
+  static {
+    availableFunctions.put("id", new IdentityExpression());
+  }
+
+  @VisibleForTesting
+  static void addFunction(String name, Expression expr) {
+    availableFunctions.put(name, expr);
+  }
+
+  public static Expression getByName(String funcName) {
+    return availableFunctions.get(funcName);
+  }
+
+  static class IdentityExpression implements Expression {
+    @Override
+    public DataPoints[] evaluate(List<DataPoints[]> queryResults) {
+      return queryResults.get(0);
     }
 
-    @VisibleForTesting
-    static void addFunction(String name, Expression expr) {
-        availableFunctions.put(name, expr);
+    @Override
+    public String toString() {
+      return "id";
     }
 
-    public static Expression getByName(String funcName) {
-        return availableFunctions.get(funcName);
-    }
-
-    static class IdentityExpression implements Expression {
-        @Override
-        public DataPoints[] evaluate(List<DataPoints[]> queryResults) {
-            return queryResults.get(0);
-        }
-    }
+  }
 
 }

@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 
+import net.opentsdb.tsd.expression.ExpressionTree;
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.buffer.ChannelBufferOutputStream;
 import org.jboss.netty.buffer.ChannelBuffers;
@@ -670,6 +671,161 @@ class HttpJsonSerializer extends HttpSerializer {
       throw new RuntimeException(e);
     }
   }
+
+	public ChannelBuffer formatQueryV1(final TSQuery data_query,
+	                                   final List<DataPoints[]> results,
+	                                   final List<Annotation> globals,
+	                                   final List<ExpressionTree> expressions) {
+		final boolean as_arrays = this.query.hasQueryStringParam("arrays");
+		final String jsonp = this.query.getQueryStringParam("jsonp");
+
+		// todo - this should be streamed at some point since it could be HUGE
+		final ChannelBuffer response = ChannelBuffers.dynamicBuffer();
+		final OutputStream output = new ChannelBufferOutputStream(response);
+		try {
+			// don't forget jsonp
+			if (jsonp != null && !jsonp.isEmpty()) {
+				output.write((jsonp + "(").getBytes(query.getCharset()));
+			}
+			JsonGenerator json = JSON.getFactory().createGenerator(output);
+			json.writeStartArray();
+
+      ExpressionTree exTree;
+      int treeIx = 0;
+			for (DataPoints[] separate_dps : results) {
+        if (expressions != null && expressions.size() > treeIx) {
+          exTree = expressions.get(treeIx);
+        } else {
+          exTree = null;
+        }
+				writePoints(separate_dps, json, data_query, globals, exTree, as_arrays);
+			}
+
+			// close
+			json.writeEndArray();
+			json.close();
+
+			if (jsonp != null && !jsonp.isEmpty()) {
+				output.write(")".getBytes());
+			}
+			return response;
+		} catch (IOException e) {
+			LOG.error("Unexpected exception", e);
+			throw new RuntimeException(e);
+		}
+	}
+
+	public void writePoints(final DataPoints[] separate_dps,
+	                        final JsonGenerator json,
+	                        final TSQuery data_query,
+	                        final List<Annotation> globals,
+	                        final ExpressionTree expression,
+	                        final boolean as_arrays) throws IOException {
+
+		for (DataPoints dps : separate_dps) {
+			json.writeStartObject();
+
+      if (expression != null) {
+        json.writeStringField("expression", expression.toString());
+      } else {
+        json.writeStringField("metric", dps.metricName());
+      }
+
+			json.writeFieldName("tags");
+			json.writeStartObject();
+			if (dps.getTags() != null) {
+				for (Map.Entry<String, String> tag : dps.getTags().entrySet()) {
+					json.writeStringField(tag.getKey(), tag.getValue());
+				}
+			}
+			json.writeEndObject();
+
+			json.writeFieldName("aggregateTags");
+			json.writeStartArray();
+			if (dps.getAggregatedTags() != null) {
+				for (String atag : dps.getAggregatedTags()) {
+					json.writeString(atag);
+				}
+			}
+			json.writeEndArray();
+
+			if (data_query.getShowTSUIDs()) {
+				json.writeFieldName("tsuids");
+				json.writeStartArray();
+				final List<String> tsuids = dps.getTSUIDs();
+				Collections.sort(tsuids);
+				for (String tsuid : tsuids) {
+					json.writeString(tsuid);
+				}
+				json.writeEndArray();
+			}
+
+			if (!data_query.getNoAnnotations()) {
+				final List<Annotation> annotations = dps.getAnnotations();
+				if (annotations != null) {
+					Collections.sort(annotations);
+					json.writeArrayFieldStart("annotations");
+					for (Annotation note : annotations) {
+						json.writeObject(note);
+					}
+					json.writeEndArray();
+				}
+
+				if (globals != null && !globals.isEmpty()) {
+					Collections.sort(globals);
+					json.writeArrayFieldStart("globalAnnotations");
+					for (Annotation note : globals) {
+						json.writeObject(note);
+					}
+					json.writeEndArray();
+				}
+			}
+
+			// now the fun stuff, dump the data
+			json.writeFieldName("dps");
+
+			// default is to write a map, otherwise write arrays
+			if (as_arrays) {
+				json.writeStartArray();
+				for (final DataPoint dp : dps) {
+					if (dp.timestamp() < data_query.startTime() ||
+							dp.timestamp() > data_query.endTime()) {
+						continue;
+					}
+					final long timestamp = data_query.getMsResolution() ?
+							dp.timestamp() : dp.timestamp() / 1000;
+					json.writeStartArray();
+					json.writeNumber(timestamp);
+					if (dp.isInteger()) {
+						json.writeNumber(dp.longValue());
+					} else {
+						json.writeNumber(dp.doubleValue());
+					}
+					json.writeEndArray();
+				}
+				json.writeEndArray();
+			} else {
+				json.writeStartObject();
+				for (final DataPoint dp : dps) {
+					if (dp.timestamp() < (data_query.startTime()) ||
+							dp.timestamp() > (data_query.endTime())) {
+						continue;
+					}
+					final long timestamp = data_query.getMsResolution() ?
+							dp.timestamp() : dp.timestamp() / 1000;
+					if (dp.isInteger()) {
+						json.writeNumberField(Long.toString(timestamp), dp.longValue());
+					} else {
+						json.writeNumberField(Long.toString(timestamp), dp.doubleValue());
+					}
+				}
+				json.writeEndObject();
+			}
+
+			// close the results for this particular query
+			json.writeEndObject();
+		}
+	}
   
   /**
    * Format a list of last data points

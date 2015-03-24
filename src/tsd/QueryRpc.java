@@ -184,8 +184,13 @@ final class QueryRpc implements HttpRpc {
     switch (query.apiVersion()) {
     case 0:
     case 1:
-      query.sendReply(query.serializer().formatQueryV1(data_query, results, 
-          globals));
+      if (data_query.getExpressionTrees() != null && data_query.getExpressionTrees().size() > 0) {
+        query.sendReply(query.serializer().formatQueryV1(data_query, results,
+                globals, data_query.getExpressionTrees()));
+      } else {
+        query.sendReply(query.serializer().formatQueryV1(data_query, results,
+                globals));
+      }
       break;
     default: 
       throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED, 
