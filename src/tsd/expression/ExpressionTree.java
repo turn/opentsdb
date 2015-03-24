@@ -5,6 +5,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import net.opentsdb.core.DataPoints;
 
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -87,36 +88,45 @@ public class ExpressionTree {
   }
 
   public String toString() {
-    return expr + "(" + DOUBLE_COMMA_JOINER.join(cleanMetricQueriesForDisplay(),
-            createSubExpressionsString(), createFuncParamsForDisplay()) + ")";
+    return writeStringField();
   }
 
-  private String createSubExpressionsString() {
-    if (subExpressions == null) {
-      return null;
-    } else {
-      return DOUBLE_COMMA_JOINER.join(subExpressions);
+  public String writeStringField() {
+    List<String> strs = Lists.newArrayList();
+    if (subExpressions != null) {
+      for (ExpressionTree sub : subExpressions) {
+        strs.add(sub.toString());
+      }
     }
+
+    if (subMetricQueries != null) {
+      String subMetrics = clean(subMetricQueries.values());
+      if (subMetrics != null && subMetrics.length() > 0) {
+        strs.add(subMetrics);
+      }
+    }
+
+    String innerExpression = DOUBLE_COMMA_JOINER.join(strs);
+    return expr.writeStringField(funcParams, innerExpression);
   }
 
-  private String createFuncParamsForDisplay() {
-    if (funcParams == null) {
-      return null;
-    } else {
-      return DOUBLE_COMMA_JOINER.join(funcParams);
+  private String clean(Collection<String> values) {
+    if (values == null || values.size() == 0) {
+      return "";
     }
+
+    List<String> strs = Lists.newArrayList();
+    for (String v : values) {
+      String tmp = v.replaceAll("\\{.*\\}", "");
+      int ix = tmp.lastIndexOf(':');
+      if (ix < 0) {
+        strs.add(tmp);
+      } else {
+        strs.add(tmp.substring(ix+1));
+      }
+    }
+
+    return DOUBLE_COMMA_JOINER.join(strs);
   }
 
-  private String cleanMetricQueriesForDisplay() {
-    List<String> metrics = Lists.newArrayList();
-    if (subMetricQueries == null) {
-      return null;
-    }
-
-    for (String m: subMetricQueries.values()) {
-      metrics.add(m.replaceAll("\\{.*\\}", ""));
-    }
-
-    return DOUBLE_COMMA_JOINER.join(metrics);
-  }
 }

@@ -14,6 +14,7 @@ public class ExpressionFactory {
 
   static {
     availableFunctions.put("id", new IdentityExpression());
+    availableFunctions.put("alias", new AliasFunction());
   }
 
   @VisibleForTesting
@@ -36,6 +37,30 @@ public class ExpressionFactory {
       return "id";
     }
 
+    @Override
+    public String writeStringField(List<String> queryParams, String innerExpression) {
+      return "id(" + innerExpression + ")";
+    }
   }
 
+  static class AliasFunction implements Expression {
+
+    @Override
+    public DataPoints[] evaluate(List<DataPoints[]> queryResults) {
+      if (queryResults == null || queryResults.size() == 0) {
+        throw new NullPointerException("No query results");
+      }
+
+      return queryResults.get(0);
+    }
+
+    @Override
+    public String writeStringField(List<String> queryParams, String innerExpression) {
+      if (queryParams == null || queryParams.size() == 0) {
+        return "NULL";
+      }
+
+      return queryParams.get(0);
+    }
+  }
 }

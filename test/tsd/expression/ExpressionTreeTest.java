@@ -51,5 +51,10 @@ public class ExpressionTreeTest {
         public DataPoints[] evaluate(List<DataPoints[]> queryResults) {
             return new DataPoints[0];
         }
+
+      @Override
+      public String writeStringField(List<String> queryParams, String innerExpression) {
+        return "foo(" + innerExpression + ")";
+      }
     }
 }
