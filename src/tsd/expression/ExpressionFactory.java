@@ -3,6 +3,7 @@ package net.opentsdb.tsd.expression;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
 import net.opentsdb.core.DataPoints;
+import net.opentsdb.core.Functions;
 
 import java.util.List;
 import java.util.Map;
@@ -15,6 +16,7 @@ public class ExpressionFactory {
   static {
     availableFunctions.put("id", new IdentityExpression());
     availableFunctions.put("alias", new AliasFunction());
+    availableFunctions.put("scale", new Functions.ScaleFunction());
   }
 
   @VisibleForTesting
@@ -28,7 +30,7 @@ public class ExpressionFactory {
 
   static class IdentityExpression implements Expression {
     @Override
-    public DataPoints[] evaluate(List<DataPoints[]> queryResults) {
+    public DataPoints[] evaluate(List<DataPoints[]> queryResults, List<String> queryParams) {
       return queryResults.get(0);
     }
 
@@ -46,7 +48,7 @@ public class ExpressionFactory {
   static class AliasFunction implements Expression {
 
     @Override
-    public DataPoints[] evaluate(List<DataPoints[]> queryResults) {
+    public DataPoints[] evaluate(List<DataPoints[]> queryResults, List<String> queryParams) {
       if (queryResults == null || queryResults.size() == 0) {
         throw new NullPointerException("No query results");
       }

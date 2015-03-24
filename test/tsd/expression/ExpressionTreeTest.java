@@ -48,7 +48,7 @@ public class ExpressionTreeTest {
 
     static class FooExpression implements Expression {
         @Override
-        public DataPoints[] evaluate(List<DataPoints[]> queryResults) {
+        public DataPoints[] evaluate(List<DataPoints[]> queryResults, List<String> queryParams) {
             return new DataPoints[0];
         }
 

@@ -84,7 +84,7 @@ public class ExpressionTree {
       }
     }
 
-    return expr.evaluate(materialized);
+    return expr.evaluate(materialized, funcParams);
   }
 
   public String toString() {

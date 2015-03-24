@@ -175,17 +175,13 @@ final class QueryRpc implements HttpRpc {
                   LOG.error("Error evaluating expression", e);
               }
           }
-
-          ChannelBuffer buff = query.serializer().formatQueryV1(data_query,
-                  exprResults, globals);
-          LOG.info(new String(buff.array()));
       }
     
     switch (query.apiVersion()) {
     case 0:
     case 1:
       if (data_query.getExpressionTrees() != null && data_query.getExpressionTrees().size() > 0) {
-        query.sendReply(query.serializer().formatQueryV1(data_query, results,
+        query.sendReply(query.serializer().formatQueryV1(data_query, exprResults,
                 globals, data_query.getExpressionTrees()));
       } else {
         query.sendReply(query.serializer().formatQueryV1(data_query, results,

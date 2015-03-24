@@ -6,7 +6,7 @@ import java.util.List;
 
 public interface Expression {
 
-  DataPoints[] evaluate(List<DataPoints[]> queryResults);
+  DataPoints[] evaluate(List<DataPoints[]> queryResults, List<String> queryParams);
 
   String writeStringField(List<String> queryParams, String innerExpression);
 
