@@ -2,6 +2,7 @@ package net.opentsdb.tsd.expression;
 
 import com.google.common.collect.Lists;
 import net.opentsdb.core.DataPoints;
+import net.opentsdb.core.TSQuery;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -18,7 +19,7 @@ public class ExpressionTreeTest {
     public void parseSimple() {
         String expr = "foo(sum:proc.sys.cpu)";
         List<String> metricQueries = Lists.newArrayList();
-        ExpressionTree tree = Expressions.parse(expr, metricQueries);
+        ExpressionTree tree = Expressions.parse(expr, metricQueries, null);
         System.out.println(metricQueries);
     }
 
@@ -26,7 +27,7 @@ public class ExpressionTreeTest {
     public void parseMultiParameter() {
         String expr = "foo(sum:proc.sys.cpu,, sum:proc.meminfo.memfree)";
         List<String> metricQueries = Lists.newArrayList();
-        ExpressionTree tree = Expressions.parse(expr, metricQueries);
+        ExpressionTree tree = Expressions.parse(expr, metricQueries, null);
         System.out.println(metricQueries);
     }
 
@@ -34,7 +35,7 @@ public class ExpressionTreeTest {
     public void parseNestedExpr() {
         String expr = "foo(sum:proc.sys.cpu,, foo(sum:proc.a.b))";
         List<String> metricQueries = Lists.newArrayList();
-        ExpressionTree tree = Expressions.parse(expr, metricQueries);
+        ExpressionTree tree = Expressions.parse(expr, metricQueries, null);
         System.out.println(metricQueries);
     }
 
@@ -42,15 +43,16 @@ public class ExpressionTreeTest {
     public void parseExprWithParam() {
         String expr = "foo(sum:proc.sys.cpu,, 100,, 3.1415)";
         List<String> metricQueries = Lists.newArrayList();
-        ExpressionTree tree = Expressions.parse(expr, metricQueries);
+        ExpressionTree tree = Expressions.parse(expr, metricQueries, null);
         System.out.println(metricQueries);
     }
 
     static class FooExpression implements Expression {
-        @Override
-        public DataPoints[] evaluate(List<DataPoints[]> queryResults, List<String> queryParams) {
-            return new DataPoints[0];
-        }
+
+      @Override
+      public DataPoints[] evaluate(TSQuery data_query, List<DataPoints[]> queryResults, List<String> queryParams) {
+        return new DataPoints[0];
+      }
 
       @Override
       public String writeStringField(List<String> queryParams, String innerExpression) {

@@ -4,6 +4,7 @@ import com.google.common.base.Joiner;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import net.opentsdb.core.DataPoints;
+import net.opentsdb.core.TSQuery;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -13,6 +14,7 @@ import java.util.Map;
 public class ExpressionTree {
 
   private final Expression expr;
+  private final TSQuery data_query;
 
   private List<ExpressionTree> subExpressions;
   private List<String> funcParams;
@@ -26,8 +28,9 @@ public class ExpressionTree {
     METRIC_QUERY
   }
 
-  public ExpressionTree(Expression expr) {
+  public ExpressionTree(Expression expr, TSQuery data_query) {
     this.expr = expr;
+    this.data_query = data_query;
   }
 
   public void addSubExpression(ExpressionTree child, int paramIndex) {
@@ -84,7 +87,7 @@ public class ExpressionTree {
       }
     }
 
-    return expr.evaluate(materialized, funcParams);
+    return expr.evaluate(data_query, materialized, funcParams);
   }
 
   public String toString() {

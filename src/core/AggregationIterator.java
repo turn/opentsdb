@@ -115,7 +115,7 @@ import org.slf4j.LoggerFactory;
  * to a special, really large value (too large to be a valid timestamp).
  * <p>
  */
-final class AggregationIterator implements SeekableView, DataPoint,
+public final class AggregationIterator implements SeekableView, DataPoint,
                                            Aggregator.Longs, Aggregator.Doubles {
 
   private static final Logger LOG =
@@ -253,12 +253,12 @@ final class AggregationIterator implements SeekableView, DataPoint,
    * @param rate If {@code true}, the rate of the series will be used instead
    * of the actual values.
    */
-  private AggregationIterator(final SeekableView[] iterators,
-                              final long start_time,
-                              final long end_time,
-                              final Aggregator aggregator,
-                              final Interpolation method,
-                              final boolean rate) {
+  public AggregationIterator(final SeekableView[] iterators,
+                             final long start_time,
+                             final long end_time,
+                             final Aggregator aggregator,
+                             final Interpolation method,
+                             final boolean rate) {
     LOG.debug("Aggregating {} iterators", iterators.length);
     this.iterators = iterators;
     this.start_time = start_time;
@@ -627,6 +627,13 @@ final class AggregationIterator implements SeekableView, DataPoint,
         r = y0 + (x - x0) * (y1 - y0) / (x1 - x0);
         //LOG.debug("Lerping to time " + x + ": " + y0 + " @ " + x0
         //          + " -> " + y1 + " @ " + x1 + " => " + r);
+//        LOG.info("LERP x1="+ x1
+//                + ", x1=" + x1
+//                + ", x=" + x
+//                + ", x0=" + x0
+//                + ", y1=" + y1
+//                + ", y0=" + y0
+//                + ", r=" + r);
         break;
       case ZIM:
         r = 0;

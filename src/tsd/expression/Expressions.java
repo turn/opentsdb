@@ -1,17 +1,15 @@
 package net.opentsdb.tsd.expression;
 
-import com.google.common.base.Preconditions;
-import com.google.common.base.Splitter;
-
 import java.util.List;
+
+import com.google.common.base.Preconditions;
+import net.opentsdb.core.TSQuery;
 
 public class Expressions {
 
-    private static final Splitter PARAM_SPLITTER =
-            Splitter.on(",,").trimResults();
-
     public static ExpressionTree parse(String expr,
-                                       List<String> metricQueries) {
+                                       List<String> metricQueries,
+                                       TSQuery data_query) {
         Preconditions.checkNotNull(expr);
         if (expr.indexOf('(') == -1 || expr.indexOf(')') == -1) {
             throw new RuntimeException("Invalid Expression: " + expr);
@@ -27,25 +25,25 @@ public class Expressions {
                     "for function '" + funcName + "'");
         }
 
-        ExpressionTree root = new ExpressionTree(rootExpr);
+        ExpressionTree root = new ExpressionTree(rootExpr, data_query);
 
         reader.skipWhitespaces();
         if (reader.peek() == '(') {
             reader.next();
-            parse(reader, metricQueries, root);
+            parse(reader, metricQueries, root, data_query);
         }
 
         return root;
     }
 
     private static void parse(ExprReader reader, List<String> metricQueries,
-                              ExpressionTree root) {
+                              ExpressionTree root, TSQuery data_query) {
 
         int parameterIndex = 0;
         reader.skipWhitespaces();
         if (reader.peek() != ')') {
             String param = reader.readNextParameter();
-            parseParam(param, metricQueries, root, parameterIndex++);
+            parseParam(param, metricQueries, root, data_query, parameterIndex++);
         }
 
         while (true) {
@@ -56,7 +54,7 @@ public class Expressions {
                 reader.skip(2); //swallow the ",," delimiter
                 reader.skipWhitespaces();
                 String param = reader.readNextParameter();
-                parseParam(param, metricQueries, root, parameterIndex++);
+                parseParam(param, metricQueries, root, data_query, parameterIndex++);
             } else {
                 throw new RuntimeException("Invalid delimiter in parameter " +
                         "list at pos=" + reader.getMark() + ", expr="
@@ -66,7 +64,7 @@ public class Expressions {
     }
 
     private static void parseParam(String param, List<String> metricQueries,
-                                   ExpressionTree root, int index) {
+                                   ExpressionTree root, TSQuery data_query, int index) {
         if (param == null || param.length() == 0) {
             throw new RuntimeException("Invalid Parameter in " +
                     "Expression");
@@ -74,7 +72,7 @@ public class Expressions {
 
         if (param.indexOf('(') > 0 && param.indexOf(')') > 0) {
             // sub expression
-            ExpressionTree subTree = parse(param, metricQueries);
+            ExpressionTree subTree = parse(param, metricQueries, data_query);
             root.addSubExpression(subTree, index);
         } else if (param.indexOf(':') >= 0) {
             // metric query

@@ -12,7 +12,7 @@ public class EvaluationTest {
     public void parseNestedExpr() {
         String expr = "id(sum:proc.meminfo.buffers,, id(sum:proc.meminfo.buffers))";
         List<String> metricQueries = Lists.newArrayList();
-        ExpressionTree tree = Expressions.parse(expr, metricQueries);
+        ExpressionTree tree = Expressions.parse(expr, metricQueries, null);
         System.out.println(metricQueries);
 
         tree.evaluate(Lists.<DataPoints[]>newArrayList(null, null));

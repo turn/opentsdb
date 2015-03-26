@@ -416,7 +416,7 @@ final class QueryRpc implements HttpRpc {
     private void prepareExpressions(List<String> exprs, TSQuery data_query,
                                     List<String> metricQueries) {
         for (String expr: exprs) {
-            ExpressionTree tree = Expressions.parse(expr, metricQueries);
+            ExpressionTree tree = Expressions.parse(expr, metricQueries, data_query);
             if (data_query.getExpressionTrees() == null) {
                 data_query.setExpressionTrees(new ArrayList<ExpressionTree>());
             }
