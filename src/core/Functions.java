@@ -17,8 +17,7 @@ public class Functions {
   private static final org.slf4j.Logger LOG =
           LoggerFactory.getLogger(Functions.class);
 
-
-  public static class SumSeriesFunction implements Expression {
+  public static class DifferenceSeriesFunction implements Expression {
 
     @Override
     public DataPoints[] evaluate(TSQuery data_query, List<DataPoints[]> queryResults, List<String> params) {
@@ -26,29 +25,40 @@ public class Functions {
         throw new NullPointerException("Query results cannot be empty");
       }
 
-      int size = 0;
-      for (DataPoints[] results: queryResults) {
-        size = size + results.length;
+      DataPoints x,y;
+      if (queryResults.size() == 2 && queryResults.get(0).length == 1
+              && queryResults.get(1).length == 1) {
+        x = queryResults.get(0)[0];
+        y = queryResults.get(1)[0];
+      } else if (queryResults.size() == 1 && queryResults.get(0).length == 2) {
+        x = queryResults.get(0)[0];
+        y = queryResults.get(0)[1];
+      } else {
+        throw new RuntimeException("Expected two query results for difference");
       }
 
+      int size = 2;
       PostAggregatedDataPoints[] seekablePoints = new PostAggregatedDataPoints[size];
-      int ix=0;
-      for (DataPoints[] results: queryResults) {
-        for (DataPoints dpoints: results) {
-          List<DataPoint> mutablePoints = new ArrayList<DataPoint>();
-          for (DataPoint point: dpoints) {
-            mutablePoints.add(point.isInteger() ?
-                    MutableDataPoint.ofLongValue(point.timestamp(), point.longValue())
-                    : MutableDataPoint.ofDoubleValue(point.timestamp(), point.doubleValue()));
-            LOG.info("Read> " + point.timestamp() + " " + point.toDouble());
-          }
-          seekablePoints[ix++] = new PostAggregatedDataPoints(dpoints,
-                  mutablePoints.toArray(new DataPoint[mutablePoints.size()]));
-          LOG.info("-------------------------------");
-        }
-      }
 
-      LOG.info("start_time=" + data_query.startTime() + ", end_time=" + data_query.endTime());
+      List<DataPoint> mutablePoints = new ArrayList<DataPoint>();
+      for (DataPoint point: x) {
+        mutablePoints.add(point.isInteger() ?
+                MutableDataPoint.ofLongValue(point.timestamp(), point.longValue())
+                : MutableDataPoint.ofDoubleValue(point.timestamp(), point.doubleValue()));
+      }
+      seekablePoints[0] = new PostAggregatedDataPoints(x,
+              mutablePoints.toArray(new DataPoint[mutablePoints.size()]));
+
+      mutablePoints = new ArrayList<DataPoint>();
+      for (DataPoint point: x) {
+        mutablePoints.add(point.isInteger() ?
+                MutableDataPoint.ofLongValue(point.timestamp(),
+                        -1 * point.longValue())
+                : MutableDataPoint.ofDoubleValue(point.timestamp(),
+                -1 * point.doubleValue()));
+      }
+      seekablePoints[1] = new PostAggregatedDataPoints(x,
+              mutablePoints.toArray(new DataPoint[mutablePoints.size()]));
 
       SeekableView[] views = new SeekableView[size];
       for (int i=0; i<size; i++) {
@@ -73,41 +83,69 @@ public class Functions {
       } else {
         return new DataPoints[]{};
       }
+    }
 
-//      SeekableView[] iterators = new SeekableView[size];
-//      int ix=0;
-//      for (DataPoints[] results: queryResults) {
-//        for (DataPoints dpoints: results) {
-//          iterators[ix] = dpoints.iterator();
-//          iterators[ix].seek(data_query.startTime());
-//          DataPoint dp = iterators[ix].next();
-//          LOG.info(">> " + dp.timestamp() + " " + dp.toDouble());
-//          ix++;
-//        }
-//      }
-//
-//      for (DataPoints[] results: queryResults) {
-//        for (DataPoints dpoints: results) {
-//          for (DataPoint dp : dpoints) {
-//            LOG.info(">>" + dp.timestamp() + " " + (dp.isInteger() ? dp.longValue() : dp.doubleValue()));
-//          }
-//          LOG.info("Processed one line");
-//        }
-//      }
-//
+    @Override
+    public String writeStringField(List<String> queryParams, String innerExpression) {
+      return "differenceSeries(" + innerExpression + ")";
+    }
+  }
+
+  public static class SumSeriesFunction implements Expression {
+
+    @Override
+    public DataPoints[] evaluate(TSQuery data_query, List<DataPoints[]> queryResults, List<String> params) {
+      if (queryResults == null || queryResults.size() == 0) {
+        throw new NullPointerException("Query results cannot be empty");
+      }
+
+      int size = 0;
+      for (DataPoints[] results: queryResults) {
+        size = size + results.length;
+      }
+
+      PostAggregatedDataPoints[] seekablePoints = new PostAggregatedDataPoints[size];
+      int ix=0;
+      for (DataPoints[] results: queryResults) {
+        for (DataPoints dpoints: results) {
+          List<DataPoint> mutablePoints = new ArrayList<DataPoint>();
+          for (DataPoint point: dpoints) {
+            mutablePoints.add(point.isInteger() ?
+                    MutableDataPoint.ofLongValue(point.timestamp(), point.longValue())
+                    : MutableDataPoint.ofDoubleValue(point.timestamp(), point.doubleValue()));
+//            LOG.info("Read> " + point.timestamp() + " " + point.toDouble());
+          }
+          seekablePoints[ix++] = new PostAggregatedDataPoints(dpoints,
+                  mutablePoints.toArray(new DataPoint[mutablePoints.size()]));
+//          LOG.info("-------------------------------");
+        }
+      }
+
 //      LOG.info("start_time=" + data_query.startTime() + ", end_time=" + data_query.endTime());
-//
-//      SeekableView view = (new AggregationIterator(iterators,
-//              data_query.startTime(), data_query.endTime(),
-//              Aggregators.SUM, Aggregators.Interpolation.LERP, false));
-//
-//      List<DataPoint> points = Lists.newArrayList();
-//      while (view.hasNext()) {
-//        points.add(view.next());
-//      }
-//
-//      return new DataPoints[] {new PostAggregatedDataPoints(queryResults.get(0)[0],
-//              points.toArray(new DataPoint[points.size()]))};
+
+      SeekableView[] views = new SeekableView[size];
+      for (int i=0; i<size; i++) {
+        views[i] = seekablePoints[i].iterator();
+      }
+
+      SeekableView view = (new AggregationIterator(views,
+              data_query.startTime(), data_query.endTime(),
+              Aggregators.SUM, Aggregators.Interpolation.LERP, false));
+
+      List<DataPoint> points = Lists.newArrayList();
+      while (view.hasNext()) {
+        DataPoint mdp = view.next();
+        points.add(mdp.isInteger() ?
+                MutableDataPoint.ofLongValue(mdp.timestamp(), mdp.longValue()) :
+                MutableDataPoint.ofDoubleValue(mdp.timestamp(), mdp.doubleValue()));
+      }
+
+      if (queryResults.size() > 0 && queryResults.get(0).length > 0) {
+        return new DataPoints[]{new PostAggregatedDataPoints(queryResults.get(0)[0],
+                points.toArray(new DataPoint[points.size()]))};
+      } else {
+        return new DataPoints[]{};
+      }
     }
 
     @Override
