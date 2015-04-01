@@ -132,7 +132,14 @@ tsdb_SRC := \
 	src/utils/JSON.java \
 	src/utils/JSONException.java	\
 	src/utils/Pair.java	\
-	src/utils/PluginLoader.java
+	src/utils/PluginLoader.java  \
+	src/tsd/expression/ExprReader.java \
+	src/tsd/expression/Expression.java \
+	src/tsd/expression/ExpressionFactory.java \
+	src/tsd/expression/ExpressionTree.java \
+	src/tsd/expression/Expressions.java \
+	src/core/PostAggregatedDataPoints.java \
+	src/core/Functions.java
 
 tsdb_DEPS = \
 	$(ASYNCHBASE)	\
