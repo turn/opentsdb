@@ -13,6 +13,7 @@
 package net.opentsdb.tsd;
 
 import java.io.IOException;
+import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -23,6 +24,8 @@ import java.util.Map;
 import com.google.common.collect.Lists;
 import net.opentsdb.tsd.expression.ExpressionTree;
 import net.opentsdb.tsd.expression.Expressions;
+import net.opentsdb.tsd.expression.parser.ParseException;
+import net.opentsdb.tsd.expression.parser.SyntaxChecker;
 import org.hbase.async.Bytes.ByteMap;
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.handler.codec.http.HttpMethod;
@@ -391,14 +394,23 @@ final class QueryRpc implements HttpRpc {
       }
     }
 
-      if (query.hasQueryStringParam("expr")) {
-          final List<String> exprs = query.getQueryStringParams("expr");
-          List<String> metricQueries = new ArrayList<String>();
-          this.prepareExpressions(exprs, data_query, metricQueries);
-          for (String mq: metricQueries) {
-              this.parseMTypeSubQuery(mq, data_query);
-          }
+    if (query.hasQueryStringParam("x")) {
+      final List<String> exprs = query.getQueryStringParams("x");
+      List<String> metricQueries = new ArrayList<String>();
+      this.syntaxCheck(exprs, data_query, metricQueries);
+      for (String mq: metricQueries) {
+        this.parseMTypeSubQuery(mq, data_query);
       }
+    }
+
+    if (query.hasQueryStringParam("expr")) {
+      final List<String> exprs = query.getQueryStringParams("expr");
+      List<String> metricQueries = new ArrayList<String>();
+      this.prepareExpressions(exprs, data_query, metricQueries);
+      for (String mq: metricQueries) {
+        this.parseMTypeSubQuery(mq, data_query);
+      }
+    }
     
     if (query.hasQueryStringParam("m")) {
       final List<String> legacy_queries = query.getQueryStringParams("m");      
@@ -413,17 +425,34 @@ final class QueryRpc implements HttpRpc {
     return data_query;
   }
 
-    private void prepareExpressions(List<String> exprs, TSQuery data_query,
-                                    List<String> metricQueries) {
-        for (String expr: exprs) {
-            ExpressionTree tree = Expressions.parse(expr, metricQueries, data_query);
-            if (data_query.getExpressionTrees() == null) {
-                data_query.setExpressionTrees(new ArrayList<ExpressionTree>());
-            }
-            data_query.getExpressionTrees().add(tree);
+  private void syntaxCheck(List<String> exprs, TSQuery tsQuery, List<String> metricQueries) {
+    for (String expr: exprs) {
+      SyntaxChecker checker = new SyntaxChecker(new StringReader(expr));
+      checker.setMetricQueries(metricQueries);
+      checker.setTSQuery(tsQuery);
+      try {
+        ExpressionTree tree = checker.EXPRESSION();
+        if (tsQuery.getExpressionTrees() == null) {
+          tsQuery.setExpressionTrees(new ArrayList<ExpressionTree>());
         }
+        tsQuery.getExpressionTrees().add(tree);
+      } catch (ParseException e) {
+        throw new RuntimeException("Could not parse " + expr, e);
+      }
     }
-  
+  }
+
+  private void prepareExpressions(List<String> exprs, TSQuery data_query,
+                                  List<String> metricQueries) {
+    for (String expr: exprs) {
+      ExpressionTree tree = Expressions.parse(expr, metricQueries, data_query);
+      if (data_query.getExpressionTrees() == null) {
+        data_query.setExpressionTrees(new ArrayList<ExpressionTree>());
+      }
+      data_query.getExpressionTrees().add(tree);
+    }
+  }
+
   /**
    * Parses a query string "m=..." type query and adds it to the TSQuery.
    * This will generate a TSSubQuery and add it to the TSQuery if successful

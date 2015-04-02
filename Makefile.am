@@ -139,7 +139,15 @@ tsdb_SRC := \
 	src/tsd/expression/ExpressionTree.java \
 	src/tsd/expression/Expressions.java \
 	src/core/PostAggregatedDataPoints.java \
-	src/core/Functions.java
+	src/core/Functions.java \
+        src/tsd/expression/parser/ParseException.java \
+	src/tsd/expression/parser/SimpleCharStream.java	\
+	src/tsd/expression/parser/SyntaxCheckerConstants.java \
+	src/tsd/expression/parser/SyntaxChecker.java \
+	src/tsd/expression/parser/SyntaxCheckerTokenManager.java \
+	src/tsd/expression/parser/Token.java \
+	src/tsd/expression/parser/TokenMgrError.java
+
 
 tsdb_DEPS = \
 	$(ASYNCHBASE)	\

@@ -28,6 +28,10 @@ public class ExpressionTree {
     METRIC_QUERY
   }
 
+  public ExpressionTree(String exprName, TSQuery data_query) {
+    this(ExpressionFactory.getByName(exprName), data_query);
+  }
+
   public ExpressionTree(Expression expr, TSQuery data_query) {
     this.expr = expr;
     this.data_query = data_query;

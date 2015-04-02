@@ -70,21 +70,16 @@ public class ExprReader {
     public String readNextParameter() {
         StringBuilder builder = new StringBuilder();
         int numNested = 0;
-        while (!Character.isWhitespace(peek()) && !isNextSeq(",,")) {
+        while (!Character.isWhitespace(peek())) {
             char ch = peek();
             if (ch == '(') numNested++;
             else if (ch == ')') numNested--;
             if (numNested < 0) {
                 break;
             }
-            builder.append(next());
-        }
-        return builder.toString();
-    }
-
-    public String readParameters() {
-        StringBuilder builder = new StringBuilder();
-        while (peek() != ')') {
+            if (numNested <= 0 && isNextSeq(",,")) {
+                break;
+            }
             builder.append(next());
         }
         return builder.toString();
