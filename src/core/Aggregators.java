@@ -21,6 +21,7 @@ import org.apache.commons.math3.stat.descriptive.rank.Percentile.EstimationType;
 import org.apache.commons.math3.util.ResizableDoubleArray;
 
 import com.google.common.base.Preconditions;
+import org.apache.log4j.Logger;
 
 /**
  * Utility class that provides common, generally useful aggregators.
@@ -71,6 +72,11 @@ public final class Aggregators {
    * if timestamps don't line up instead of interpolating. */
   public static final Aggregator MIMMAX = new Max(
       Interpolation.MIN, "mimmax");
+
+  /**
+   * Return the product of two time series */
+  public static final Aggregator MULTIPLY = new Multiply(
+      Interpolation.LERP, "multiply");
   
   /** Aggregator that returns the number of data points.
    * WARNING: This currently interpolates with zero-if-missing. In this case 
@@ -213,6 +219,46 @@ public final class Aggregators {
       return method;
     }
     
+  }
+
+  private static final class Multiply implements Aggregator {
+
+    private final Interpolation method;
+    private final String name;
+
+    public Multiply(final Interpolation method, final String name) {
+      this.method = method;
+      this.name = name;
+    }
+
+    @Override
+    public long runLong(Longs values) {
+      long result = values.nextLongValue();
+      while (values.hasNextValue()) {
+        result *= values.nextLongValue();
+      }
+      return result;
+    }
+
+    @Override
+    public double runDouble(Doubles values) {
+      double result = values.nextDoubleValue();
+      while (values.hasNextValue()) {
+        double d = values.nextDoubleValue();
+        result *= d;
+      }
+      return result;
+    }
+
+    @Override
+    public String toString() {
+      return name;
+    }
+
+    @Override
+    public Interpolation interpolationMethod() {
+      return method;
+    }
   }
 
   private static final class Min implements Aggregator {
