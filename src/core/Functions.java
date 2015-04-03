@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.google.common.collect.Lists;
+import com.google.common.math.DoubleMath;
 import net.opentsdb.tsd.expression.Expression;
 import net.opentsdb.tsd.expression.ExpressionTree;
 import org.apache.log4j.Logger;
@@ -17,6 +18,88 @@ public class Functions {
 
   private static final org.slf4j.Logger LOG =
           LoggerFactory.getLogger(Functions.class);
+
+  public static class DivideSeriesFunction implements Expression {
+
+    @Override
+    public DataPoints[] evaluate(TSQuery data_query, List<DataPoints[]> queryResults, List<String> params) {
+      if (queryResults == null || queryResults.size() == 0) {
+        throw new NullPointerException("Query results cannot be empty");
+      }
+
+      DataPoints x,y;
+      if (queryResults.size() == 2 && queryResults.get(0).length == 1
+              && queryResults.get(1).length == 1) {
+        x = queryResults.get(0)[0];
+        y = queryResults.get(1)[0];
+      } else if (queryResults.size() == 1 && queryResults.get(0).length == 2) {
+        x = queryResults.get(0)[0];
+        y = queryResults.get(0)[1];
+      } else {
+        throw new RuntimeException("Expected two query results for difference");
+      }
+
+      int size = 2;
+      PostAggregatedDataPoints[] seekablePoints = new PostAggregatedDataPoints[size];
+
+      List<DataPoint> mutablePoints = new ArrayList<DataPoint>();
+      for (DataPoint point: x) {
+        mutablePoints.add(point.isInteger() ?
+                MutableDataPoint.ofLongValue(point.timestamp(), point.longValue())
+                : MutableDataPoint.ofDoubleValue(point.timestamp(), point.doubleValue()));
+      }
+      seekablePoints[0] = new PostAggregatedDataPoints(x,
+              mutablePoints.toArray(new DataPoint[mutablePoints.size()]));
+
+      mutablePoints = new ArrayList<DataPoint>();
+      for (DataPoint point: y) {
+        if (point.isInteger()) {
+          if (point.longValue() != 0) {
+            mutablePoints.add(MutableDataPoint.ofLongValue(point.timestamp(),
+                    1 / point.longValue()));
+          }
+        } else {
+          if (DoubleMath.fuzzyCompare(point.doubleValue(), 0, 1E-7) != 0) {
+            mutablePoints.add(MutableDataPoint.ofDoubleValue(point.timestamp(),
+                    1 / point.doubleValue()));
+          }
+        }
+      }
+
+      seekablePoints[1] = new PostAggregatedDataPoints(x,
+              mutablePoints.toArray(new DataPoint[mutablePoints.size()]));
+
+      SeekableView[] views = new SeekableView[size];
+      for (int i=0; i<size; i++) {
+        views[i] = seekablePoints[i].iterator();
+      }
+
+      SeekableView view = (new AggregationIterator(views,
+              data_query.startTime(), data_query.endTime(),
+              Aggregators.MULTIPLY, Aggregators.Interpolation.LERP, false));
+
+      List<DataPoint> points = Lists.newArrayList();
+      while (view.hasNext()) {
+        DataPoint mdp = view.next();
+        points.add(mdp.isInteger() ?
+                MutableDataPoint.ofLongValue(mdp.timestamp(), mdp.longValue()) :
+                MutableDataPoint.ofDoubleValue(mdp.timestamp(), mdp.doubleValue()));
+      }
+
+      if (queryResults.size() > 0 && queryResults.get(0).length > 0) {
+        return new DataPoints[]{new PostAggregatedDataPoints(queryResults.get(0)[0],
+                points.toArray(new DataPoint[points.size()]))};
+      } else {
+        return new DataPoints[]{};
+      }
+    }
+
+
+    @Override
+    public String writeStringField(List<String> queryParams, String innerExpression) {
+      return "divideSeries(" + innerExpression + ")";
+    }
+  }
 
   public static class MultiplySeriesFunction implements Expression {
 

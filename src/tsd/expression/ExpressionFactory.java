@@ -22,6 +22,7 @@ public class ExpressionFactory {
     availableFunctions.put("sum", new Functions.SumSeriesFunction());
     availableFunctions.put("difference", new Functions.DifferenceSeriesFunction());
     availableFunctions.put("multiply", new Functions.MultiplySeriesFunction());
+    availableFunctions.put("divide", new Functions.DivideSeriesFunction());
   }
 
   @VisibleForTesting
