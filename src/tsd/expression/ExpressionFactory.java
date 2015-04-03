@@ -23,6 +23,7 @@ public class ExpressionFactory {
     availableFunctions.put("difference", new Functions.DifferenceSeriesFunction());
     availableFunctions.put("multiply", new Functions.MultiplySeriesFunction());
     availableFunctions.put("divide", new Functions.DivideSeriesFunction());
+    availableFunctions.put("movingAverage", new Functions.MovingAverageFunction());
   }
 
   @VisibleForTesting

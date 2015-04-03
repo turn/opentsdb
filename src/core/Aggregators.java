@@ -13,6 +13,8 @@
 package net.opentsdb.core;
 
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.NoSuchElementException;
 import java.util.Set;
 
@@ -21,7 +23,6 @@ import org.apache.commons.math3.stat.descriptive.rank.Percentile.EstimationType;
 import org.apache.commons.math3.util.ResizableDoubleArray;
 
 import com.google.common.base.Preconditions;
-import org.apache.log4j.Logger;
 
 /**
  * Utility class that provides common, generally useful aggregators.
@@ -77,7 +78,7 @@ public final class Aggregators {
    * Return the product of two time series */
   public static final Aggregator MULTIPLY = new Multiply(
       Interpolation.LERP, "multiply");
-  
+
   /** Aggregator that returns the number of data points.
    * WARNING: This currently interpolates with zero-if-missing. In this case 
    * counts will be off when counting multiple time series. Only use this when
@@ -187,6 +188,7 @@ public final class Aggregators {
   }
 
   private static final class Sum implements Aggregator {
+
     private final Interpolation method;
     private final String name;
     
@@ -194,8 +196,9 @@ public final class Aggregators {
       this.method = method;
       this.name = name;
     }
-    
-    public long runLong(final Longs values) {
+
+    @Override
+    public long runLong(Longs values) {
       long result = values.nextLongValue();
       while (values.hasNextValue()) {
         result += values.nextLongValue();
@@ -218,7 +221,6 @@ public final class Aggregators {
     public Interpolation interpolationMethod() {
       return method;
     }
-    
   }
 
   private static final class Multiply implements Aggregator {
@@ -258,6 +260,117 @@ public final class Aggregators {
     @Override
     public Interpolation interpolationMethod() {
       return method;
+    }
+  }
+
+  static final class MovingAverage implements Aggregator {
+    private LinkedList<SumPoint> list = new LinkedList<SumPoint>();
+    private final Interpolation method;
+    private final String name;
+    private final long numPoints;
+    private final boolean isTimeUnit;
+
+    public MovingAverage(final Interpolation method, final String name, long numPoints, boolean isTimeUnit) {
+      this.method = method;
+      this.name = name;
+      this.numPoints = numPoints;
+      this.isTimeUnit = isTimeUnit;
+    }
+
+    public long runLong(final Longs values) {
+      long sum = values.nextLongValue();
+      while (values.hasNextValue()) {
+        sum += values.nextLongValue();
+      }
+
+      if (values instanceof DataPoint) {
+        long ts = ((DataPoint) values).timestamp();
+        list.addFirst(new SumPoint(ts, sum));
+      }
+
+      long result=0; int count=0;
+
+      Iterator<SumPoint> iter = list.iterator();
+      SumPoint first = iter.next();
+      boolean conditionMet = false;
+
+      // now sum up the preceeding points
+      while(iter.hasNext()) {
+        SumPoint next = iter.next();
+        result += (Long) next.val;
+        count++;
+        if (!isTimeUnit && count >= numPoints) {
+          conditionMet = true;
+          break;
+        } else if (isTimeUnit && ((first.ts - next.ts) > numPoints)) {
+          conditionMet = true;
+          break;
+        }
+      }
+
+      if (!conditionMet || count == 0) {
+        return 0;
+      }
+
+      return result/count;
+    }
+
+    @Override
+    public double runDouble(Doubles values) {
+      double sum = values.nextDoubleValue();
+      while (values.hasNextValue()) {
+        sum += values.nextDoubleValue();
+      }
+
+      if (values instanceof DataPoint) {
+        long ts = ((DataPoint) values).timestamp();
+        list.addFirst(new SumPoint(ts, sum));
+      }
+
+      double result=0; int count=0;
+
+      Iterator<SumPoint> iter = list.iterator();
+      SumPoint first = iter.next();
+      boolean conditionMet = false;
+
+      // now sum up the preceeding points
+      while(iter.hasNext()) {
+        SumPoint next = iter.next();
+        result += (Double) next.val;
+        count++;
+        if (!isTimeUnit && count >= numPoints) {
+          conditionMet = true;
+          break;
+        } else if (isTimeUnit && ((first.ts - next.ts) > numPoints)) {
+          conditionMet = true;
+          break;
+        }
+      }
+
+      if (!conditionMet || count == 0) {
+        return 0;
+      }
+
+      return result/count;
+    }
+
+    @Override
+    public Interpolation interpolationMethod() {
+      return method;
+    }
+
+    @Override
+    public String toString() {
+      return name;
+    }
+
+    class SumPoint {
+      long ts;
+      Object val;
+      public SumPoint(long ts, Object val) {
+        this.ts = ts;
+        this.val = val;
+      }
     }
   }
 

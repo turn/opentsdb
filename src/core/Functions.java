@@ -6,6 +6,7 @@ package net.opentsdb.core;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import com.google.common.collect.Lists;
 import com.google.common.math.DoubleMath;
@@ -19,11 +20,133 @@ public class Functions {
   private static final org.slf4j.Logger LOG =
           LoggerFactory.getLogger(Functions.class);
 
+  public static class MovingAverageFunction implements Expression {
+
+    @Override
+    public DataPoints[] evaluate(TSQuery data_query, List<DataPoints[]> queryResults, List<String> params) {
+      if (queryResults == null || queryResults.isEmpty()) {
+        return new DataPoints[]{};
+      }
+
+      if (params == null || params.isEmpty()) {
+        throw new NullPointerException("Need aggregation window for moving average");
+      }
+      String param = params.get(0);
+      if (param == null || param.length() == 0) {
+        throw new NullPointerException("Invalid window='" + param + "'");
+      }
+
+      param = param.trim();
+
+      long numPoints = -1;
+      boolean isTimeUnit = false;
+      if (param.matches("[0-9]+")) {
+        numPoints = Integer.parseInt(param);
+      } else if (param.startsWith("'") && param.endsWith("'")) {
+        numPoints = parseParam(param);
+        isTimeUnit = true;
+      }
+
+      if (numPoints <= 0) {
+        throw new RuntimeException("numPoints <= 0");
+      }
+
+      int size = 0;
+      for (DataPoints[] results: queryResults) {
+        size = size + results.length;
+      }
+
+      PostAggregatedDataPoints[] seekablePoints = new PostAggregatedDataPoints[size];
+      int ix=0;
+      for (DataPoints[] results: queryResults) {
+        for (DataPoints dpoints: results) {
+          List<DataPoint> mutablePoints = new ArrayList<DataPoint>();
+          for (DataPoint point: dpoints) {
+            mutablePoints.add(point.isInteger() ?
+                    MutableDataPoint.ofLongValue(point.timestamp(), point.longValue())
+                    : MutableDataPoint.ofDoubleValue(point.timestamp(), point.doubleValue()));
+          }
+          seekablePoints[ix++] = new PostAggregatedDataPoints(dpoints,
+                  mutablePoints.toArray(new DataPoint[mutablePoints.size()]));
+        }
+      }
+
+      SeekableView[] views = new SeekableView[size];
+      for (int i=0; i<size; i++) {
+        views[i] = seekablePoints[i].iterator();
+      }
+
+      SeekableView view = new AggregationIterator(views,
+              data_query.startTime(), data_query.endTime(),
+              new Aggregators.MovingAverage(Aggregators.Interpolation.LERP, "movingAverage", numPoints, isTimeUnit),
+              Aggregators.Interpolation.LERP, false);
+
+      List<DataPoint> points = Lists.newArrayList();
+      while (view.hasNext()) {
+        DataPoint mdp = view.next();
+        points.add(mdp.isInteger() ?
+                MutableDataPoint.ofLongValue(mdp.timestamp(), mdp.longValue()) :
+                MutableDataPoint.ofDoubleValue(mdp.timestamp(), mdp.doubleValue()));
+      }
+
+      if (queryResults.size() > 0 && queryResults.get(0).length > 0) {
+        return new DataPoints[]{new PostAggregatedDataPoints(queryResults.get(0)[0],
+                points.toArray(new DataPoint[points.size()]))};
+      } else {
+        return new DataPoints[]{};
+      }
+    }
+
+    public long parseParam(String param) {
+      char[] chars = param.toCharArray();
+      int tuIndex = 0;
+      for (int c = 1; c < chars.length; c++) {
+        if (Character.isDigit(chars[c])) {
+          tuIndex++;
+        } else {
+          break;
+        }
+      }
+
+      if (tuIndex == 0) {
+        throw new RuntimeException("Invalid Parameter: " + param);
+      }
+
+      int time = Integer.parseInt(param.substring(1, tuIndex+1));
+      String unit = param.substring(tuIndex+1, param.length() - 1);
+
+      if ("min".equals(unit)) {
+        return TimeUnit.MILLISECONDS.convert(time, TimeUnit.MINUTES);
+      } else if ("hr".equals(unit)) {
+        return TimeUnit.MILLISECONDS.convert(time, TimeUnit.HOURS);
+      } else if ("sec".equals(unit)) {
+        return TimeUnit.MILLISECONDS.convert(time, TimeUnit.SECONDS);
+      } else {
+        throw new RuntimeException("unknown time unit=" + unit);
+      }
+
+    }
+
+    @Override
+    public String writeStringField(List<String> queryParams, String innerExpression) {
+      return "movingAverage(" + innerExpression + ")";
+    }
+
+  }
+
+  public static class HighestCurrent {
+
+  }
+
+  public static class HighestMax {
+
+  }
+
   public static class DivideSeriesFunction implements Expression {
 
     @Override
     public DataPoints[] evaluate(TSQuery data_query, List<DataPoints[]> queryResults, List<String> params) {
-      if (queryResults == null || queryResults.size() == 0) {
+      if (queryResults == null || queryResults.isEmpty()) {
         throw new NullPointerException("Query results cannot be empty");
       }
 
@@ -105,7 +228,7 @@ public class Functions {
 
     @Override
     public DataPoints[] evaluate(TSQuery data_query, List<DataPoints[]> queryResults, List<String> queryParams) {
-      if (queryResults == null || queryResults.size() == 0) {
+      if (queryResults == null || queryResults.isEmpty()) {
         throw new NullPointerException("Query results cannot be empty");
       }
 
@@ -164,7 +287,7 @@ public class Functions {
 
     @Override
     public DataPoints[] evaluate(TSQuery data_query, List<DataPoints[]> queryResults, List<String> params) {
-      if (queryResults == null || queryResults.size() == 0) {
+      if (queryResults == null || queryResults.isEmpty()) {
         throw new NullPointerException("Query results cannot be empty");
       }
 
@@ -238,7 +361,7 @@ public class Functions {
 
     @Override
     public DataPoints[] evaluate(TSQuery data_query, List<DataPoints[]> queryResults, List<String> params) {
-      if (queryResults == null || queryResults.size() == 0) {
+      if (queryResults == null || queryResults.isEmpty()) {
         throw new NullPointerException("Query results cannot be empty");
       }
 
@@ -301,11 +424,11 @@ public class Functions {
 
     @Override
     public DataPoints[] evaluate(TSQuery data_query, List<DataPoints[]> queryResults, List<String> params) {
-      if (queryResults == null || queryResults.size() == 0) {
+      if (queryResults == null || queryResults.isEmpty()) {
         throw new NullPointerException("Query results cannot be empty");
       }
 
-      if (params == null || params.size() == 0) {
+      if (params == null || params.isEmpty()) {
         throw new NullPointerException("Scaling parameter not available");
       }
 
