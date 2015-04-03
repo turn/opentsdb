@@ -50,7 +50,7 @@ public class Functions {
               mutablePoints.toArray(new DataPoint[mutablePoints.size()]));
 
       mutablePoints = new ArrayList<DataPoint>();
-      for (DataPoint point: x) {
+      for (DataPoint point: y) {
         mutablePoints.add(point.isInteger() ?
                 MutableDataPoint.ofLongValue(point.timestamp(),
                         -1 * point.longValue())
