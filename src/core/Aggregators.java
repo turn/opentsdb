@@ -15,6 +15,7 @@ package net.opentsdb.core;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Set;
 
@@ -373,6 +374,183 @@ public final class Aggregators {
       }
     }
   }
+
+  public static class MaxCacheAggregator implements Aggregator {
+
+    private final Interpolation method;
+    private final String name;
+    private final int size;
+    private final long[] maxLongs;
+    private final double[] maxDoubles;
+    private boolean hasLongs = false;
+    private boolean hasDoubles = false;
+
+    public MaxCacheAggregator(Interpolation method, String name, int size) {
+      this.method = method;
+      this.name = name;
+      this.size = size;
+
+      this.maxLongs = new long[size];
+      this.maxDoubles = new double[size];
+
+      for (int i=0; i<size; i++) {
+        maxDoubles[i] = Double.MIN_VALUE;
+        maxLongs[i] = Long.MIN_VALUE;
+      }
+    }
+
+    @Override
+    public long runLong(Longs values) {
+      long[] longs = new long[size];
+      int ix = 0;
+      longs[ix++] = values.nextLongValue();
+      while (values.hasNextValue()) {
+        longs[ix++] = values.nextLongValue();
+      }
+
+      for (int i=0; i<size;i++) {
+        maxLongs[i] = Math.max(maxLongs[i], longs[i]);
+      }
+
+      hasLongs = true;
+      return 0;
+    }
+
+    @Override
+    public double runDouble(Doubles values) {
+      double[] doubles = new double[size];
+      int ix = 0;
+      doubles[ix++] = values.nextDoubleValue();
+      while (values.hasNextValue()) {
+        doubles[ix++] = values.nextDoubleValue();
+      }
+      for (int i=0; i<size;i++) {
+        maxDoubles[i] = Math.max(maxDoubles[i], doubles[i]);
+      }
+
+      hasDoubles = true;
+      return 0;
+    }
+
+    public long[] getLongMaxes() {
+      return maxLongs;
+    }
+
+    public double[] getDoubleMaxes() {
+      return maxDoubles;
+    }
+
+    public boolean hasLongs() {
+      return hasLongs;
+    }
+
+    public boolean hasDoubles() {
+      return hasDoubles;
+    }
+
+    @Override
+    public String toString() {
+      return name;
+    }
+
+    @Override
+    public Interpolation interpolationMethod() {
+      return method;
+    }
+  }
+
+  public static class MaxLatestAggregator implements Aggregator {
+
+    private final Interpolation method;
+    private final String name;
+    private final int size;
+    private final long[] maxLongs;
+    private final double[] maxDoubles;
+    private boolean hasLongs = false;
+    private boolean hasDoubles = false;
+    private long latestTS = -1;
+
+    public MaxLatestAggregator(Interpolation method, String name, int size) {
+      this.method = method;
+      this.name = name;
+      this.size = size;
+
+      this.maxLongs = new long[size];
+      this.maxDoubles = new double[size];
+
+      for (int i=0; i<size; i++) {
+        maxDoubles[i] = Double.MIN_VALUE;
+        maxLongs[i] = Long.MIN_VALUE;
+      }
+    }
+
+    @Override
+    public long runLong(Longs values) {
+      long[] longs = new long[size];
+      int ix = 0;
+      longs[ix++] = values.nextLongValue();
+      while (values.hasNextValue()) {
+        longs[ix++] = values.nextLongValue();
+      }
+
+      if (values instanceof DataPoint) {
+        long ts = ((DataPoint) values).timestamp();
+        if (ts > latestTS) {
+          System.arraycopy(longs, 0, maxLongs, 0, size);
+        }
+      }
+
+      hasLongs = true;
+      return 0;
+    }
+
+    @Override
+    public double runDouble(Doubles values) {
+      double[] doubles = new double[size];
+      int ix = 0;
+      doubles[ix++] = values.nextDoubleValue();
+      while (values.hasNextValue()) {
+        doubles[ix++] = values.nextDoubleValue();
+      }
+
+      if (values instanceof DataPoint) {
+        long ts = ((DataPoint) values).timestamp();
+        if (ts > latestTS) {
+          System.arraycopy(doubles, 0, maxDoubles, 0, size);
+        }
+      }
+
+      hasDoubles = true;
+      return 0;
+    }
+
+    public long[] getLongMaxes() {
+      return maxLongs;
+    }
+
+    public double[] getDoubleMaxes() {
+      return maxDoubles;
+    }
+
+    public boolean hasLongs() {
+      return hasLongs;
+    }
+
+    public boolean hasDoubles() {
+      return hasDoubles;
+    }
+
+    @Override
+    public String toString() {
+      return name;
+    }
+
+    @Override
+    public Interpolation interpolationMethod() {
+      return method;
+    }
+  }
+
 
   private static final class Min implements Aggregator {
     private final Interpolation method;

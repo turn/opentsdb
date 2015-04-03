@@ -5,20 +5,19 @@
 package net.opentsdb.core;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import com.google.common.collect.Lists;
 import com.google.common.math.DoubleMath;
 import net.opentsdb.tsd.expression.Expression;
-import net.opentsdb.tsd.expression.ExpressionTree;
 import org.apache.log4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class Functions {
 
-  private static final org.slf4j.Logger LOG =
-          LoggerFactory.getLogger(Functions.class);
+  private static final Logger logger = Logger.getLogger(Functions.class);
 
   public static class MovingAverageFunction implements Expression {
 
@@ -31,6 +30,7 @@ public class Functions {
       if (params == null || params.isEmpty()) {
         throw new NullPointerException("Need aggregation window for moving average");
       }
+
       String param = params.get(0);
       if (param == null || param.length() == 0) {
         throw new NullPointerException("Invalid window='" + param + "'");
@@ -112,7 +112,7 @@ public class Functions {
         throw new RuntimeException("Invalid Parameter: " + param);
       }
 
-      int time = Integer.parseInt(param.substring(1, tuIndex+1));
+      int time = Integer.parseInt(param.substring(1, tuIndex + 1));
       String unit = param.substring(tuIndex+1, param.length() - 1);
 
       if ("min".equals(unit)) {
@@ -134,12 +134,231 @@ public class Functions {
 
   }
 
-  public static class HighestCurrent {
+  public static class HighestMax implements Expression {
+    @Override
+    public DataPoints[] evaluate(TSQuery data_query, List<DataPoints[]> queryResults,
+                                 List<String> params) {
+      if (queryResults == null || queryResults.isEmpty()) {
+        throw new NullPointerException("Query results cannot be empty");
+      }
 
+      if (params == null || params.isEmpty()) {
+        throw new NullPointerException("Need aggregation window for moving average");
+      }
+
+      String param = params.get(0);
+      if (param == null || param.length() == 0) {
+        throw new NullPointerException("Invalid window='" + param + "'");
+      }
+
+      int k = Integer.parseInt(param.trim());
+
+      int size = 0;
+      for (DataPoints[] results: queryResults) {
+        size = size + results.length;
+      }
+
+      PostAggregatedDataPoints[] seekablePoints = new PostAggregatedDataPoints[size];
+      int ix=0;
+      for (DataPoints[] results: queryResults) {
+        for (DataPoints dpoints: results) {
+          List<DataPoint> mutablePoints = new ArrayList<DataPoint>();
+          for (DataPoint point: dpoints) {
+            mutablePoints.add(point.isInteger() ?
+                    MutableDataPoint.ofLongValue(point.timestamp(), point.longValue())
+                    : MutableDataPoint.ofDoubleValue(point.timestamp(), point.doubleValue()));
+          }
+          seekablePoints[ix++] = new PostAggregatedDataPoints(dpoints,
+                  mutablePoints.toArray(new DataPoint[mutablePoints.size()]));
+        }
+      }
+
+      if (k >= size) {
+        return seekablePoints;
+      }
+
+      SeekableView[] views = new SeekableView[size];
+      for (int i=0; i<size; i++) {
+        views[i] = seekablePoints[i].iterator();
+      }
+
+      Aggregators.MaxCacheAggregator aggregator = new Aggregators.MaxCacheAggregator(
+              Aggregators.Interpolation.LERP, "maxCache", size);
+
+      SeekableView view = (new AggregationIterator(views,
+              data_query.startTime(), data_query.endTime(),
+              aggregator, Aggregators.Interpolation.LERP, false));
+
+      // slurp all the points
+      while (view.hasNext()) {
+        DataPoint mdp = view.next();
+        Object o = mdp.isInteger() ? mdp.longValue() : mdp.doubleValue();
+      }
+
+      long[] maxLongs = aggregator.getLongMaxes();
+      double[] maxDoubles = aggregator.getDoubleMaxes();
+      Entry[] maxesPerTS = new Entry[size];
+      if (aggregator.hasDoubles() && aggregator.hasLongs()) {
+         for (int i=0; i<size; i++) {
+           maxesPerTS[i] = new Entry(Math.max((double)maxLongs[i], maxDoubles[i]), i);
+         }
+      } else if (aggregator.hasLongs() && !aggregator.hasDoubles()) {
+        for (int i=0; i<size; i++) {
+          maxesPerTS[i] = new Entry((double) maxLongs[i], i);
+        }
+      } else if (aggregator.hasDoubles() && !aggregator.hasLongs()) {
+        for (int i=0; i<size; i++) {
+          maxesPerTS[i] = new Entry(maxDoubles[i], i);
+        }
+      }
+
+      logger.info("Before Sorting: " + Arrays.toString(maxesPerTS));
+
+      Arrays.sort(maxesPerTS, new Comparator<Entry>() {
+        @Override
+        public int compare(Entry o1, Entry o2) {
+          // we want in descending order
+          return -1 * Double.compare(o1.val, o2.val);
+        }
+      });
+
+      logger.info("After Sorting: " + Arrays.toString(maxesPerTS));
+
+      DataPoints[] results = new DataPoints[k];
+      for (int i=0; i<k; i++) {
+        results[i] = seekablePoints[maxesPerTS[i].pos];
+      }
+
+      return results;
+    }
+
+    class Entry {
+      public Entry(double val, int pos) {
+        this.val = val;
+        this.pos = pos;
+      }
+      double val;
+      int pos;
+
+      @Override
+      public String toString() {
+        return "{" + this.val + "," + this.pos + "}";
+      }
+
+    }
+
+    @Override
+    public String writeStringField(List<String> queryParams, String innerExpression) {
+      return "highestMax(" + innerExpression + ")";
+    }
   }
 
-  public static class HighestMax {
+  public static class HighestCurrent implements Expression {
+    @Override
+    public DataPoints[] evaluate(TSQuery data_query, List<DataPoints[]> queryResults,
+                                 List<String> params) {
+      if (queryResults == null || queryResults.isEmpty()) {
+        throw new NullPointerException("Query results cannot be empty");
+      }
 
+      if (params == null || params.isEmpty()) {
+        throw new NullPointerException("Need aggregation window for moving average");
+      }
+
+      String param = params.get(0);
+      if (param == null || param.length() == 0) {
+        throw new NullPointerException("Invalid window='" + param + "'");
+      }
+
+      int k = Integer.parseInt(param.trim());
+
+      int size = 0;
+      for (DataPoints[] results: queryResults) {
+        size = size + results.length;
+      }
+
+      PostAggregatedDataPoints[] seekablePoints = new PostAggregatedDataPoints[size];
+      int ix=0;
+      for (DataPoints[] results: queryResults) {
+        for (DataPoints dpoints: results) {
+          List<DataPoint> mutablePoints = new ArrayList<DataPoint>();
+          for (DataPoint point: dpoints) {
+            mutablePoints.add(point.isInteger() ?
+                    MutableDataPoint.ofLongValue(point.timestamp(), point.longValue())
+                    : MutableDataPoint.ofDoubleValue(point.timestamp(), point.doubleValue()));
+          }
+          seekablePoints[ix++] = new PostAggregatedDataPoints(dpoints,
+                  mutablePoints.toArray(new DataPoint[mutablePoints.size()]));
+        }
+      }
+
+      if (k >= size) {
+        return seekablePoints;
+      }
+
+      SeekableView[] views = new SeekableView[size];
+      for (int i=0; i<size; i++) {
+        views[i] = seekablePoints[i].iterator();
+      }
+
+      Aggregators.MaxLatestAggregator aggregator = new Aggregators.MaxLatestAggregator(
+              Aggregators.Interpolation.LERP, "maxLatest", size);
+
+      SeekableView view = (new AggregationIterator(views,
+              data_query.startTime(), data_query.endTime(),
+              aggregator, Aggregators.Interpolation.LERP, false));
+
+      // slurp all the points
+      while (view.hasNext()) {
+        DataPoint mdp = view.next();
+        Object o = mdp.isInteger() ? mdp.longValue() : mdp.doubleValue();
+      }
+
+      long[] maxLongs = aggregator.getLongMaxes();
+      double[] maxDoubles = aggregator.getDoubleMaxes();
+      Entry[] maxesPerTS = new Entry[size];
+      if (aggregator.hasDoubles() && aggregator.hasLongs()) {
+        for (int i=0; i<size; i++) {
+          maxesPerTS[i] = new Entry(Math.max((double)maxLongs[i], maxDoubles[i]), i);
+        }
+      } else if (aggregator.hasLongs() && !aggregator.hasDoubles()) {
+        for (int i=0; i<size; i++) {
+          maxesPerTS[i] = new Entry((double) maxLongs[i], i);
+        }
+      } else if (aggregator.hasDoubles() && !aggregator.hasLongs()) {
+        for (int i=0; i<size; i++) {
+          maxesPerTS[i] = new Entry(maxDoubles[i], i);
+        }
+      }
+
+      Arrays.sort(maxesPerTS, new Comparator<Entry>() {
+        @Override
+        public int compare(Entry o1, Entry o2) {
+          return -1 * Double.compare(o1.val, o2.val);
+        }
+      });
+
+      DataPoints[] results = new DataPoints[k];
+      for (int i=0; i<k; i++) {
+        results[i] = seekablePoints[maxesPerTS[i].pos];
+      }
+
+      return results;
+    }
+
+    class Entry {
+      public Entry(double val, int pos) {
+        this.val = val;
+        this.pos = pos;
+      }
+      double val;
+      int pos;
+    }
+
+    @Override
+    public String writeStringField(List<String> queryParams, String innerExpression) {
+      return "highestCurrent(" + innerExpression + ")";
+    }
   }
 
   public static class DivideSeriesFunction implements Expression {
@@ -379,15 +598,11 @@ public class Functions {
             mutablePoints.add(point.isInteger() ?
                     MutableDataPoint.ofLongValue(point.timestamp(), point.longValue())
                     : MutableDataPoint.ofDoubleValue(point.timestamp(), point.doubleValue()));
-//            LOG.info("Read> " + point.timestamp() + " " + point.toDouble());
           }
           seekablePoints[ix++] = new PostAggregatedDataPoints(dpoints,
                   mutablePoints.toArray(new DataPoint[mutablePoints.size()]));
-//          LOG.info("-------------------------------");
         }
       }
-
-//      LOG.info("start_time=" + data_query.startTime() + ", end_time=" + data_query.endTime());
 
       SeekableView[] views = new SeekableView[size];
       for (int i=0; i<size; i++) {
