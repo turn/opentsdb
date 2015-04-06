@@ -385,10 +385,16 @@ public final class Aggregators {
     private boolean hasLongs = false;
     private boolean hasDoubles = false;
 
-    public MaxCacheAggregator(Interpolation method, String name, int size) {
+    private long start;
+    private long end;
+
+    public MaxCacheAggregator(Interpolation method, String name, int size,
+                              long startTimeInMillis, long endTimeInMillis) {
       this.method = method;
       this.name = name;
       this.size = size;
+      this.start = startTimeInMillis;
+      this.end = endTimeInMillis;
 
       this.maxLongs = new long[size];
       this.maxDoubles = new double[size];
@@ -401,6 +407,14 @@ public final class Aggregators {
 
     @Override
     public long runLong(Longs values) {
+      if (values instanceof DataPoint) {
+        long ts = ((DataPoint) values).timestamp();
+        //data point falls outside required range
+        if (ts < start || ts > end) {
+          return 0;
+        }
+      }
+
       long[] longs = new long[size];
       int ix = 0;
       longs[ix++] = values.nextLongValue();
@@ -418,6 +432,14 @@ public final class Aggregators {
 
     @Override
     public double runDouble(Doubles values) {
+      if (values instanceof DataPoint) {
+        long ts = ((DataPoint) values).timestamp();
+        //data point falls outside required range
+        if (ts < start || ts > end) {
+          return 0;
+        }
+      }
+
       double[] doubles = new double[size];
       int ix = 0;
       doubles[ix++] = values.nextDoubleValue();
@@ -466,14 +488,20 @@ public final class Aggregators {
     private final int size;
     private final long[] maxLongs;
     private final double[] maxDoubles;
+    private final long start;
+    private final long end;
     private boolean hasLongs = false;
     private boolean hasDoubles = false;
     private long latestTS = -1;
 
-    public MaxLatestAggregator(Interpolation method, String name, int size) {
+    public MaxLatestAggregator(Interpolation method, String name, int size,
+                               long startTimeInMillis, long endTimeInMillis) {
       this.method = method;
       this.name = name;
       this.size = size;
+      this.start = startTimeInMillis;
+      this.end = endTimeInMillis;
+
 
       this.maxLongs = new long[size];
       this.maxDoubles = new double[size];
@@ -486,6 +514,14 @@ public final class Aggregators {
 
     @Override
     public long runLong(Longs values) {
+      if (values instanceof DataPoint) {
+        long ts = ((DataPoint) values).timestamp();
+        //data point falls outside required range
+        if (ts < start || ts > end) {
+          return 0;
+        }
+      }
+
       long[] longs = new long[size];
       int ix = 0;
       longs[ix++] = values.nextLongValue();
@@ -506,6 +542,14 @@ public final class Aggregators {
 
     @Override
     public double runDouble(Doubles values) {
+      if (values instanceof DataPoint) {
+        long ts = ((DataPoint) values).timestamp();
+        //data point falls outside required range
+        if (ts < start || ts > end) {
+          return 0;
+        }
+      }
+
       double[] doubles = new double[size];
       int ix = 0;
       doubles[ix++] = values.nextDoubleValue();

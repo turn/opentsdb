@@ -136,7 +136,7 @@ public class Functions {
 
   public static class HighestMax implements Expression {
     @Override
-    public DataPoints[] evaluate(TSQuery data_query, List<DataPoints[]> queryResults,
+    public DataPoints[] evaluate(TSQuery query, List<DataPoints[]> queryResults,
                                  List<String> params) {
       if (queryResults == null || queryResults.isEmpty()) {
         throw new NullPointerException("Query results cannot be empty");
@@ -183,10 +183,10 @@ public class Functions {
       }
 
       Aggregators.MaxCacheAggregator aggregator = new Aggregators.MaxCacheAggregator(
-              Aggregators.Interpolation.LERP, "maxCache", size);
+              Aggregators.Interpolation.LERP, "maxCache", size, query.startTime(), query.endTime());
 
       SeekableView view = (new AggregationIterator(views,
-              data_query.startTime(), data_query.endTime(),
+              query.startTime(), query.endTime(),
               aggregator, Aggregators.Interpolation.LERP, false));
 
       // slurp all the points
@@ -301,8 +301,9 @@ public class Functions {
         views[i] = seekablePoints[i].iterator();
       }
 
-      Aggregators.MaxLatestAggregator aggregator = new Aggregators.MaxLatestAggregator(
-              Aggregators.Interpolation.LERP, "maxLatest", size);
+      Aggregators.MaxLatestAggregator aggregator = new
+              Aggregators.MaxLatestAggregator(Aggregators.Interpolation.LERP,
+              "maxLatest", size, data_query.startTime(), data_query.endTime());
 
       SeekableView view = (new AggregationIterator(views,
               data_query.startTime(), data_query.endTime(),
