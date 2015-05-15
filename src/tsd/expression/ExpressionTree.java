@@ -21,7 +21,7 @@ public class ExpressionTree {
   private Map<Integer, String> subMetricQueries;
   private Map<Integer, Parameter> parameterSourceIndex = Maps.newHashMap();
 
-  private static final Joiner DOUBLE_COMMA_JOINER = Joiner.on(",,").skipNulls();
+  private static final Joiner DOUBLE_COMMA_JOINER = Joiner.on(",").skipNulls();
 
   enum Parameter {
     SUB_EXPRESSION,
