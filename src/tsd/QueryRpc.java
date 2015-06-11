@@ -168,17 +168,17 @@ final class QueryRpc implements HttpRpc {
       throw new RuntimeException("Shouldn't be here", e);
     }
 
-      List<ExpressionTree> exprs = data_query.getExpressionTrees();
-      List<DataPoints[]> exprResults = Lists.newArrayList();
-      if (exprs != null && exprs.size() > 0) {
-          for (ExpressionTree tree: exprs) {
-              try {
-                  exprResults.add(tree.evaluate(results));
-              } catch (Exception e) {
-                  LOG.error("Error evaluating expression", e);
-              }
-          }
+    List<ExpressionTree> exprs = data_query.getExpressionTrees();
+    List<DataPoints[]> exprResults = Lists.newArrayList();
+    if (exprs != null && exprs.size() > 0) {
+      for (ExpressionTree tree: exprs) {
+        try {
+          exprResults.add(tree.evaluate(results));
+        } catch (Exception e) {
+            LOG.error("Error evaluating expression", e);
+        }
       }
+    }
     
     switch (query.apiVersion()) {
     case 0:
@@ -425,6 +425,12 @@ final class QueryRpc implements HttpRpc {
     return data_query;
   }
 
+  /**
+   * This code is copied at GraphHandler.java
+   * If you make changes here, replicate them at GraphHandler.
+   *
+   * TODO: De-duplicate this function
+   */
   private void syntaxCheck(List<String> exprs, TSQuery tsQuery, List<String> metricQueries) {
     for (String expr: exprs) {
       SyntaxChecker checker = new SyntaxChecker(new StringReader(expr));

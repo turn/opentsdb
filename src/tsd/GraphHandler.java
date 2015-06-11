@@ -18,8 +18,11 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.io.StringReader;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -34,6 +37,11 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.JsonMappingException;
+import com.google.common.collect.Lists;
+import net.opentsdb.core.TSQuery;
+import net.opentsdb.tsd.expression.ExpressionTree;
+import net.opentsdb.tsd.expression.parser.ParseException;
+import net.opentsdb.tsd.expression.parser.SyntaxChecker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -159,8 +167,24 @@ final class GraphHandler implements HttpRpc {
     }
     Query[] tsdbqueries;
     List<String> options;
-    tsdbqueries = parseQuery(tsdb, query);
+
+    final boolean isExpressionQuery = query.getQueryStringParams("x")  != null;
+    TSQuery expressionHolder = new TSQuery();
+    if (isExpressionQuery) {
+      expressionHolder.setStart(query.getRequiredQueryStringParam("start"));
+      expressionHolder.setEnd(query.getQueryStringParam("end"));
+      expressionHolder.validateTimes();
+
+    }
+    // parse the query, and populate expressionHolder
+    tsdbqueries = parseQuery(tsdb, query, expressionHolder);
     options = query.getQueryStringParams("o");
+    if (isExpressionQuery && options != null) {
+      for (int i = options.size(); i < tsdbqueries.length; i++) {
+        options.add("");
+      }
+    }
+
     if (options == null) {
       options = new ArrayList<String>(tsdbqueries.length);
       for (int i = 0; i < tsdbqueries.length; i++) {
@@ -190,11 +214,37 @@ final class GraphHandler implements HttpRpc {
     @SuppressWarnings("unchecked")
     final HashSet<String>[] aggregated_tags = new HashSet[nqueries];
     int npoints = 0;
-    for (int i = 0; i < nqueries; i++) {
+
+    List<DataPoints[]> perTimeSeriesResults = new ArrayList<DataPoints[]>();
+    for (Query tsdbquery : tsdbqueries) {
+      DataPoints[] series = tsdbquery.run();
+      perTimeSeriesResults.add(series);
+    }
+
+    List<DataPoints[]> exprResults;
+    if (isExpressionQuery) {
+      exprResults = Lists.newArrayList();
+      List<ExpressionTree> exprs = expressionHolder.getExpressionTrees();
+      if (exprs != null && exprs.size() > 0) {
+        for (ExpressionTree tree : exprs) {
+          try {
+            exprResults.add(tree.evaluate(perTimeSeriesResults));
+          } catch (Exception e) {
+            LOG.error("Error evaluating expression", e);
+            throw new BadRequestException("Error evaluating expression", e);
+          }
+        }
+      }
+    } else {
+      exprResults = perTimeSeriesResults;
+    }
+
+    for (int i = 0; i < exprResults.size(); i++) {
       try {  // execute the TSDB query!
         // XXX This is slow and will block Netty.  TODO(tsuna): Don't block.
         // TODO(tsuna): Optimization: run each query in parallel.
-        final DataPoints[] series = tsdbqueries[i].run();
+        DataPoints[] series = exprResults.get(i);
+
         for (final DataPoints datapoints : series) {
           plot.add(datapoints, options.get(i));
           aggregated_tags[i] = new HashSet<String>();
@@ -216,6 +266,7 @@ final class GraphHandler implements HttpRpc {
     }
 
     try {
+      LOG.info("basepath=" + basepath);
       gnuplot.execute(new RunGnuplot(query, max_age, plot, basepath,
                                      aggregated_tags, npoints));
     } catch (RejectedExecutionException e) {
@@ -824,6 +875,23 @@ final class GraphHandler implements HttpRpc {
     }
   }
 
+  private static void syntaxCheck(List<String> exprs, TSQuery tsQuery, List<String> metricQueries) {
+    for (String expr: exprs) {
+      SyntaxChecker checker = new SyntaxChecker(new StringReader(expr));
+      checker.setMetricQueries(metricQueries);
+      checker.setTSQuery(tsQuery);
+      try {
+        ExpressionTree tree = checker.EXPRESSION();
+        if (tsQuery.getExpressionTrees() == null) {
+          tsQuery.setExpressionTrees(new ArrayList<ExpressionTree>());
+        }
+        tsQuery.getExpressionTrees().add(tree);
+      } catch (ParseException e) {
+        throw new RuntimeException("Could not parse " + expr, e);
+      }
+    }
+  }
+
   /**
    * Parses the {@code /q} query in a list of {@link Query} objects.
    * @param tsdb The TSDB to use.
@@ -832,10 +900,16 @@ final class GraphHandler implements HttpRpc {
    * @throws BadRequestException if the query was malformed.
    * @throws IllegalArgumentException if the metric or tags were malformed.
    */
-  private static Query[] parseQuery(final TSDB tsdb, final HttpQuery query) {
-    final List<String> ms = query.getQueryStringParams("m");
+  private static Query[] parseQuery(final TSDB tsdb, final HttpQuery query, TSQuery expressions) {
+    List<String> ms = query.getQueryStringParams("m");
     if (ms == null) {
-      throw BadRequestException.missingParameter("m");
+      List<String> expressionParams = query.getQueryStringParams("x");
+      if (expressionParams != null) {
+        ms = new ArrayList<String>();
+        syntaxCheck(expressionParams, expressions, ms);
+      } else {
+        throw BadRequestException.missingParameter("m or x");
+      }
     }
     final Query[] tsdbqueries = new Query[ms.size()];
     int nqueries = 0;

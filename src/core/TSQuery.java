@@ -123,7 +123,28 @@ public final class TSQuery {
       sub.validateAndSetQuery();
     }
   }
-  
+
+  /**
+   * More duplicated code. This is copied from the above functions.
+   */
+  public void validateTimes() {
+    if (start == null || start.isEmpty()) {
+      throw new IllegalArgumentException("Missing start time");
+    }
+    start_time = DateTime.parseDateTimeString(start, timezone);
+
+    if (end != null && !end.isEmpty()) {
+      end_time = DateTime.parseDateTimeString(end, timezone);
+    } else {
+      end_time = System.currentTimeMillis();
+    }
+    if (end_time <= start_time) {
+      throw new IllegalArgumentException(
+              "End time [" + end_time + "] must be greater than the start time ["
+                      + start_time +"]");
+    }
+  }
+
   /**
    * Compiles the TSQuery into an array of Query objects for execution.
    * If the user has not set a down sampler explicitly, and they don't want 
