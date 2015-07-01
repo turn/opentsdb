@@ -4,9 +4,11 @@
  */
 package net.opentsdb.core;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.google.common.collect.Maps;
 import com.stumbleupon.async.Deferred;
 import net.opentsdb.meta.Annotation;
 
@@ -15,6 +17,8 @@ public class PostAggregatedDataPoints implements DataPoints {
   private final DataPoints baseDataPoints;
   private final DataPoint[] points;
 
+  private String alias = null;
+
   public PostAggregatedDataPoints(DataPoints baseDataPoints, DataPoint[] points) {
     this.baseDataPoints = baseDataPoints;
     this.points = points;
@@ -22,27 +26,36 @@ public class PostAggregatedDataPoints implements DataPoints {
 
   @Override
   public String metricName() {
-    return baseDataPoints.metricName();
+    if (alias != null) return alias;
+    else return baseDataPoints.metricName();
   }
 
   @Override
   public Deferred<String> metricNameAsync() {
+    if (alias != null) return Deferred.fromResult(alias);
     return baseDataPoints.metricNameAsync();
   }
 
   @Override
   public Map<String, String> getTags() {
-    return baseDataPoints.getTags();
+    if (alias != null) return Maps.newHashMap();
+    else return baseDataPoints.getTags();
   }
 
   @Override
   public Deferred<Map<String, String>> getTagsAsync() {
+    Map<String, String> def = new HashMap<String, String>();
+    if (alias != null) return Deferred.fromResult(def);
     return baseDataPoints.getTagsAsync();
   }
 
   @Override
   public List<String> getAggregatedTags() {
     return baseDataPoints.getAggregatedTags();
+  }
+
+  public void setAlias(String alias) {
+    this.alias = alias;
   }
 
   @Override

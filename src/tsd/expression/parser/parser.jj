@@ -35,7 +35,7 @@ public class SyntaxChecker {
 PARSER_END(SyntaxChecker)
 
 SKIP:  { " " | "\t" | "\n" | "\r"                    }
-TOKEN: { <NAME: ("*" | (["a" - "z"] | ["A" - "Z"]| ["0"-"9"] | "-" | "_" | "#" | "/" | "@" | "|" | "." | "'" | "]" | "[")+ )> }
+TOKEN: { <NAME: ("*" | (["a" - "z"] | ["A" - "Z"]| ["0"-"9"] | "-" | "_" | "#" | "/" | "$" | "@" | "|" | "." | "'" | "]" | "[")+ )> }
 TOKEN: { <PARAM: ("&&")> }
 
 ExpressionTree EXPRESSION():  {Token name; int paramIndex=0;}  {

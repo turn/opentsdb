@@ -726,7 +726,7 @@ class HttpJsonSerializer extends HttpSerializer {
 			json.writeStartObject();
 
       if (expression != null) {
-        json.writeStringField("expression", expression.writeStringField());
+        json.writeStringField("expression", dps.metricName());
       } else {
         json.writeStringField("metric", dps.metricName());
       }

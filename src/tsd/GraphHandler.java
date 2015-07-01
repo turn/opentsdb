@@ -113,6 +113,13 @@ final class GraphHandler implements HttpRpc {
   }
 
   public void execute(final TSDB tsdb, final HttpQuery query) {
+
+
+    float f1 = Float.parseFloat("0.35");
+    float f2 = Float.parseFloat("0.65");
+    float n = Float.parseFloat("0.00035");
+    LOG.info("result = " + (n / (1 - (f2 + f1 + 0))));
+
     if (!query.hasQueryStringParam("json")
         && !query.hasQueryStringParam("png")
         && !query.hasQueryStringParam("ascii")) {
