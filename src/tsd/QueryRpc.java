@@ -422,6 +422,14 @@ final class QueryRpc implements HttpRpc {
     if (data_query.getQueries() == null || data_query.getQueries().size() < 1) {
       throw new BadRequestException("Missing sub queries");
     }
+
+    QueryStats.numQueries().inc();
+    if (data_query.getExpressionTrees() != null) {
+      QueryStats.numExpressions().inc(data_query.getExpressionTrees().size());
+    }
+    if (data_query.getQueries() != null) {
+      QueryStats.numMetrics().inc(data_query.getQueries().size());
+    }
     return data_query;
   }
 

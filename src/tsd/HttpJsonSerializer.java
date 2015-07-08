@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 
+import com.codahale.metrics.Timer;
 import net.opentsdb.tsd.expression.ExpressionTree;
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.buffer.ChannelBufferOutputStream;
@@ -542,14 +543,15 @@ class HttpJsonSerializer extends HttpSerializer {
   public ChannelBuffer formatQueryV1(final TSQuery data_query, 
       final List<DataPoints[]> results, final List<Annotation> globals) {
 
-    LOG.info("Entering formatQueryV1");
-    
     final boolean as_arrays = this.query.hasQueryStringParam("arrays");
     final String jsonp = this.query.getQueryStringParam("jsonp");
     
     // todo - this should be streamed at some point since it could be HUGE
     final ChannelBuffer response = ChannelBuffers.dynamicBuffer();
     final OutputStream output = new ChannelBufferOutputStream(response);
+
+    Timer.Context timerContext = QueryStats.resultProcessing().time();
+
     try {
       // don't forget jsonp
       if (jsonp != null && !jsonp.isEmpty()) {
@@ -671,10 +673,14 @@ class HttpJsonSerializer extends HttpSerializer {
       if (jsonp != null && !jsonp.isEmpty()) {
         output.write(")".getBytes());
       }
+
       return response;
     } catch (IOException e) {
       LOG.error("Unexpected exception", e);
+      timerContext.stop();
       throw new RuntimeException(e);
+    } finally {
+      timerContext.stop();
     }
   }
 
@@ -688,6 +694,8 @@ class HttpJsonSerializer extends HttpSerializer {
 		// todo - this should be streamed at some point since it could be HUGE
 		final ChannelBuffer response = ChannelBuffers.dynamicBuffer();
 		final OutputStream output = new ChannelBufferOutputStream(response);
+
+        Timer.Context timerContext = QueryStats.resultProcessing().time();
 		try {
 			// don't forget jsonp
 			if (jsonp != null && !jsonp.isEmpty()) {
@@ -718,8 +726,10 @@ class HttpJsonSerializer extends HttpSerializer {
 		} catch (IOException e) {
 			LOG.error("Unexpected exception", e);
 			throw new RuntimeException(e);
-		}
-	}
+		} finally {
+          timerContext.stop();
+        }
+    }
 
 	public void writePoints(final DataPoints[] separate_dps,
 	                        final JsonGenerator json,

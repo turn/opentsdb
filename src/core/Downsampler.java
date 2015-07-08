@@ -14,6 +14,9 @@ package net.opentsdb.core;
 
 import java.util.NoSuchElementException;
 
+import com.codahale.metrics.Timer;
+import net.opentsdb.tsd.QueryStats;
+
 
 /**
  * Iterator that downsamples data points using an {@link Aggregator}.
@@ -48,14 +51,19 @@ public class Downsampler implements SeekableView, DataPoint {
   // ------------------ //
 
   public boolean hasNext() {
-    return values_in_interval.hasNextValue();
+    Timer.Context context = QueryStats.downSampleTimer().time();
+    boolean b = values_in_interval.hasNextValue();
+    context.stop();
+    return b;
   }
 
   public DataPoint next() {
     if (hasNext()) {
+      Timer.Context context = QueryStats.downSampleTimer().time();
       value = downsampler.runDouble(values_in_interval);
       timestamp = values_in_interval.getIntervalTimestamp();
       values_in_interval.moveToNextInterval();
+      context.stop();
       return this;
     }
     throw new NoSuchElementException("no more data points in " + this);

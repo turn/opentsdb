@@ -482,7 +482,7 @@ public final class AggregationIterator implements SeekableView, DataPoint,
   }
 
   public long longValue() {
-    Timer.Context context = QueryStats.downSampleTimer().time();
+    Timer.Context context = QueryStats.aggregationTimer().time();
     if (isInteger()) {
       pos = -1;
       long l = aggregator.runLong(this);
@@ -493,7 +493,7 @@ public final class AggregationIterator implements SeekableView, DataPoint,
   }
 
   public double doubleValue() {
-    Timer.Context context = QueryStats.downSampleTimer().time();
+    Timer.Context context = QueryStats.aggregationTimer().time();
     if (!isInteger()) {
       pos = -1;
       try {
@@ -544,25 +544,31 @@ public final class AggregationIterator implements SeekableView, DataPoint,
   }
 
   public long nextLongValue() {
+    Timer.Context timerContext = QueryStats.interpolationTimer().time();
     if (hasNextValue(true)) {
       final long y0 = values[pos];
       if (rate) {
+        timerContext.stop();
         throw new AssertionError("Should not be here, impossible! " + this);
       }
       if (current == pos) {
+        timerContext.stop();
         return y0;
       }
       final long x = timestamps[current] & TIME_MASK;
       final long x0 = timestamps[pos] & TIME_MASK;
       if (x == x0) {
+        timerContext.stop();
         return y0;
       }
       final long y1 = values[pos + iterators.length];
       final long x1 = timestamps[pos + iterators.length] & TIME_MASK;
       if (x == x1) {
+        timerContext.stop();
         return y1;
       }
       if ((x1 & Const.MILLISECOND_MASK) != 0) {
+        timerContext.stop();
         throw new AssertionError("x1=" + x1 + " in " + this);
       }
       final long r;
@@ -582,10 +588,13 @@ public final class AggregationIterator implements SeekableView, DataPoint,
           r = Long.MIN_VALUE;
           break;
         default:
+          timerContext.stop();
           throw new IllegalDataException("Invalid interploation somehow??");
       }
+      timerContext.stop();
       return r;
     }
+    timerContext.stop();
     throw new NoSuchElementException("no more longs in " + this);
   }
 
@@ -594,12 +603,14 @@ public final class AggregationIterator implements SeekableView, DataPoint,
   // ---------------------------- //
 
   public double nextDoubleValue() {
+    Timer.Context timerContext = QueryStats.interpolationTimer().time();
     if (hasNextValue(true)) {
       final double y0 = ((timestamps[pos] & FLAG_FLOAT) == FLAG_FLOAT
                          ? Double.longBitsToDouble(values[pos])
                          : values[pos]);
       if (current == pos) {
         //LOG.debug("Exact match, no lerp needed");
+        timerContext.stop();
         return y0;
       }
       if (rate) {
@@ -610,12 +621,14 @@ public final class AggregationIterator implements SeekableView, DataPoint,
         // instead. It happens only at the beginning of iteration.
         // TODO: Use the next rate the time range of which includes the current
         // timestamp 'x'.
+        timerContext.stop();
         return y0;
       }
       final long x = timestamps[current] & TIME_MASK;
       final long x0 = timestamps[pos] & TIME_MASK;
       if (x == x0) {
         //LOG.debug("No lerp needed x == x0 (" + x + " == "+x0+") => " + y0);
+        timerContext.stop();
         return y0;
       }
       final int next = pos + iterators.length;
@@ -625,9 +638,11 @@ public final class AggregationIterator implements SeekableView, DataPoint,
       final long x1 = timestamps[next] & TIME_MASK;
       if (x == x1) {
         //LOG.debug("No lerp needed x == x1 (" + x + " == "+x1+") => " + y1);
+        timerContext.stop();
         return y1;
       }
       if ((x1 & Const.MILLISECOND_MASK) != 0) {
+        timerContext.stop();
         throw new AssertionError("x1=" + x1 + " in " + this);
       }
       final double r;
@@ -654,10 +669,13 @@ public final class AggregationIterator implements SeekableView, DataPoint,
         r = Double.MIN_VALUE;
         break;
       default:
+        timerContext.stop();
         throw new IllegalDataException("Invalid interploation somehow??");
     }
+      timerContext.stop();
       return r;
     }
+    timerContext.stop();
     throw new NoSuchElementException("no more doubles in " + this);
   }
 
