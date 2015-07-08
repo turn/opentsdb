@@ -22,7 +22,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 
-import com.codahale.metrics.Timer;
+import net.opentsdb.core.metrics.Timer;
 import net.opentsdb.tsd.expression.ExpressionTree;
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.buffer.ChannelBufferOutputStream;

@@ -14,7 +14,7 @@ package net.opentsdb.core;
 
 import java.util.NoSuchElementException;
 
-import com.codahale.metrics.Timer;
+import net.opentsdb.core.metrics.Timer;
 import net.opentsdb.tsd.QueryStats;
 
 

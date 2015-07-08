@@ -16,7 +16,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.NoSuchElementException;
 
-import com.codahale.metrics.Timer;
+import net.opentsdb.core.metrics.Timer;
 import com.google.common.annotations.VisibleForTesting;
 
 import net.opentsdb.core.Aggregators.Interpolation;

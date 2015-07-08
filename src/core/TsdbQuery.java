@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
-import com.codahale.metrics.Timer;
+import net.opentsdb.core.metrics.Timer;
 import net.opentsdb.tsd.QueryStats;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

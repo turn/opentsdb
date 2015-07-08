@@ -31,6 +31,45 @@ dist_noinst_SCRIPTS = src/create_table.sh src/upgrade_1to2.sh src/mygnuplot.sh \
 dist_noinst_DATA = pom.xml.in build-aux/rpm/opentsdb.conf \
   build-aux/rpm/logback.xml build-aux/rpm/init.d/opentsdb
 tsdb_SRC := \
+	src/core/metrics/CachedGauge.java  \
+	src/core/metrics/Clock.java  \
+	src/core/metrics/ConsoleReporter.java  \
+	src/core/metrics/Counter.java  \
+	src/core/metrics/Counting.java  \
+	src/core/metrics/CsvReporter.java  \
+	src/core/metrics/DefaultObjectNameFactory.java  \
+	src/core/metrics/DerivativeGauge.java  \
+	src/core/metrics/EWMA.java  \
+	src/core/metrics/ExponentiallyDecayingReservoir.java \
+	src/core/metrics/Gauge.java  \
+	src/core/metrics/Histogram.java  \
+	src/core/metrics/JmxAttributeGauge.java  \
+	src/core/metrics/JmxReporter.java  \
+	src/core/metrics/JvmAttributeGaugeSet.java  \
+	src/core/metrics/LongAdder.java  \
+	src/core/metrics/Meter.java  \
+	src/core/metrics/Metered.java  \
+	src/core/metrics/Metric.java  \
+	src/core/metrics/MetricFilter.java  \
+	src/core/metrics/MetricRegistry.java  \
+	src/core/metrics/MetricRegistryListener.java  \
+	src/core/metrics/MetricSet.java  \
+	src/core/metrics/ObjectNameFactory.java  \
+	src/core/metrics/RatioGauge.java  \
+	src/core/metrics/Reporter.java  \
+	src/core/metrics/Reservoir.java  \
+	src/core/metrics/Sampling.java  \
+	src/core/metrics/ScheduledReporter.java  \
+	src/core/metrics/SharedMetricRegistries.java  \
+	src/core/metrics/Slf4jReporter.java  \
+	src/core/metrics/SlidingTimeWindowReservoir.java  \
+	src/core/metrics/SlidingWindowReservoir.java  \
+	src/core/metrics/Snapshot.java  \
+	src/core/metrics/Striped64.java  \
+	src/core/metrics/ThreadLocalRandom.java  \
+	src/core/metrics/Timer.java  \
+	src/core/metrics/UniformSnapshot.java  \
+	src/core/metrics/WeightedSnapshot.java \
 	src/core/AggregationIterator.java	\
 	src/core/Aggregator.java	\
 	src/core/Aggregators.java	\
@@ -140,14 +179,14 @@ tsdb_SRC := \
 	src/tsd/expression/Expressions.java \
 	src/core/PostAggregatedDataPoints.java \
 	src/core/Functions.java \
-        src/tsd/expression/parser/ParseException.java \
+    src/tsd/expression/parser/ParseException.java \
 	src/tsd/expression/parser/SimpleCharStream.java	\
 	src/tsd/expression/parser/SyntaxCheckerConstants.java \
 	src/tsd/expression/parser/SyntaxChecker.java \
 	src/tsd/expression/parser/SyntaxCheckerTokenManager.java \
 	src/tsd/expression/parser/Token.java \
-	src/tsd/expression/parser/TokenMgrError.java
-
+	src/tsd/expression/parser/TokenMgrError.java \
+	src/tsd/QueryStats.java
 
 tsdb_DEPS = \
 	$(ASYNCHBASE)	\
