@@ -91,6 +91,7 @@ public final class StatsRpc implements TelnetRpc, HttpRpc {
     RpcHandler.collectStats(collector);
     RpcManager.collectStats(collector);
     tsdb.collectStats(collector);
+    QueryStats.collectStats(collector);
     query.sendReply(query.serializer().formatStatsV1(dps));
   }
   
@@ -105,6 +106,7 @@ public final class StatsRpc implements TelnetRpc, HttpRpc {
     ConnectionManager.collectStats(collector);
     RpcHandler.collectStats(collector);
     RpcManager.collectStats(collector);
+    QueryStats.collectStats(collector);
     tsdb.collectStats(collector);
   }
   

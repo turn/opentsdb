@@ -16,9 +16,11 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.NoSuchElementException;
 
+import com.codahale.metrics.Timer;
 import com.google.common.annotations.VisibleForTesting;
 
 import net.opentsdb.core.Aggregators.Interpolation;
+import net.opentsdb.tsd.QueryStats;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -480,23 +482,30 @@ public final class AggregationIterator implements SeekableView, DataPoint,
   }
 
   public long longValue() {
+    Timer.Context context = QueryStats.downSampleTimer().time();
     if (isInteger()) {
       pos = -1;
-      return aggregator.runLong(this);
+      long l = aggregator.runLong(this);
+      context.stop();
+      return l;
     }
     throw new ClassCastException("current value is a double: " + this);
   }
 
   public double doubleValue() {
+    Timer.Context context = QueryStats.downSampleTimer().time();
     if (!isInteger()) {
       pos = -1;
-      final double value = aggregator.runDouble(this);
-      //LOG.debug("aggregator returned " + value);
-      if (value != value || Double.isInfinite(value)) {
-        throw new IllegalStateException("Got NaN or Infinity: "
-           + value + " in this " + this);
+      try {
+        final double value = aggregator.runDouble(this);
+        if (value != value || Double.isInfinite(value)) {
+          throw new IllegalStateException("Got NaN or Infinity: "
+                  + value + " in this " + this);
+        }
+        return value;
+      } finally {
+        context.stop();
       }
-      return value;
     }
     throw new ClassCastException("current value is a long: " + this);
   }

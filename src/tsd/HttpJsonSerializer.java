@@ -541,6 +541,8 @@ class HttpJsonSerializer extends HttpSerializer {
    */
   public ChannelBuffer formatQueryV1(final TSQuery data_query, 
       final List<DataPoints[]> results, final List<Annotation> globals) {
+
+    LOG.info("Entering formatQueryV1");
     
     final boolean as_arrays = this.query.hasQueryStringParam("arrays");
     final String jsonp = this.query.getQueryStringParam("jsonp");
@@ -619,10 +621,12 @@ class HttpJsonSerializer extends HttpSerializer {
           if (as_arrays) {
             json.writeStartArray();
             for (final DataPoint dp : dps) {
+              QueryStats.numberOfPointsInResponse().inc();
               if (dp.timestamp() < data_query.startTime() || 
                   dp.timestamp() > data_query.endTime()) {
                 continue;
               }
+              QueryStats.numberOfResponsePointsSerialized().inc();
               final long timestamp = data_query.getMsResolution() ? 
                   dp.timestamp() : dp.timestamp() / 1000;
               json.writeStartArray();
@@ -638,10 +642,12 @@ class HttpJsonSerializer extends HttpSerializer {
           } else {
             json.writeStartObject();
             for (final DataPoint dp : dps) {
+              QueryStats.numberOfPointsInResponse().inc();
               if (dp.timestamp() < (data_query.startTime()) || 
                   dp.timestamp() > (data_query.endTime())) {
                 continue;
               }
+              QueryStats.numberOfResponsePointsSerialized().inc();
               final long timestamp = data_query.getMsResolution() ? 
                   dp.timestamp() : dp.timestamp() / 1000;
               if (dp.isInteger()) {
@@ -722,6 +728,8 @@ class HttpJsonSerializer extends HttpSerializer {
 	                        final ExpressionTree expression,
 	                        final boolean as_arrays) throws IOException {
 
+      LOG.info("Responding JSON");
+
 		for (DataPoints dps : separate_dps) {
 			json.writeStartObject();
 
@@ -788,6 +796,8 @@ class HttpJsonSerializer extends HttpSerializer {
 			if (as_arrays) {
 				json.writeStartArray();
 				for (final DataPoint dp : dps) {
+                  QueryStats.
+                          numberOfPointsInResponse().inc();
 					if (dp.timestamp() < data_query.startTime() ||
 							dp.timestamp() > data_query.endTime()) {
 						continue;
@@ -801,12 +811,14 @@ class HttpJsonSerializer extends HttpSerializer {
 					} else {
 						json.writeNumber(dp.doubleValue());
 					}
+                    QueryStats.numberOfResponsePointsSerialized().inc();
 					json.writeEndArray();
 				}
 				json.writeEndArray();
 			} else {
 				json.writeStartObject();
 				for (final DataPoint dp : dps) {
+                    QueryStats.numberOfPointsInResponse().inc();
 					if (dp.timestamp() < (data_query.startTime()) ||
 							dp.timestamp() > (data_query.endTime())) {
 						continue;
@@ -818,6 +830,7 @@ class HttpJsonSerializer extends HttpSerializer {
 					} else {
 						json.writeNumberField(Long.toString(timestamp), dp.doubleValue());
 					}
+                    QueryStats.numberOfResponsePointsSerialized().inc();
 				}
 				json.writeEndObject();
 			}

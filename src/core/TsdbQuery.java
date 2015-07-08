@@ -22,6 +22,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
+import com.codahale.metrics.Timer;
+import net.opentsdb.tsd.QueryStats;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.hbase.async.Bytes;
@@ -390,6 +392,9 @@ final class TsdbQuery implements Query {
          throws Exception {
          hbase_time += (System.nanoTime() - starttime) / 1000000;
          try {
+
+           Timer.Context processScan = QueryStats.processScan().time();
+
            if (rows == null) {
              hbase_time += (System.nanoTime() - starttime) / 1000000;
              scanlatency.add(hbase_time);
@@ -401,13 +406,15 @@ final class TsdbQuery implements Query {
                results.callback(spans);
              }
              scanner.close();
+             LOG.info("Closing scanner");
              return null;
            }
            
            if (timeout > 0 && hbase_time > timeout) {
              throw new InterruptedException("Query timeout exceeded!");
            }
-           
+
+           int totalSize = 0;
            for (final ArrayList<KeyValue> row : rows) {
              final byte[] key = row.get(0).key();
              if (Bytes.memcmp(metric, key, 0, metric_width) != 0) {
@@ -422,6 +429,11 @@ final class TsdbQuery implements Query {
                datapoints = new Span(tsdb);
                spans.put(key, datapoints);
              }
+
+             int size = datapoints.size();
+             QueryStats.numberOfScannedPointsCounter().inc(size);
+             totalSize += size;
+
              final KeyValue compacted = 
                tsdb.compact(row, datapoints.getAnnotations());
              seenAnnotation |= !datapoints.getAnnotations().isEmpty();
@@ -430,6 +442,9 @@ final class TsdbQuery implements Query {
                nrows++;
              }
            }
+
+           processScan.stop();
+           LOG.info("Number of scanned points: " + totalSize);
 
            return scan();
          } catch (Exception e) {
@@ -440,6 +455,7 @@ final class TsdbQuery implements Query {
        }
      }
 
+    LOG.info("Starting scanner");
      new ScannerCB().scan();
      return results;
   }
@@ -460,6 +476,8 @@ final class TsdbQuery implements Query {
     */
     @Override
     public DataPoints[] call(final TreeMap<byte[], Span> spans) throws Exception {
+      LOG.info("Starting GroupByAndAggregateCB");
+      Timer.Context timerContext = QueryStats.groupByTimer().time();
       if (spans == null || spans.size() <= 0) {
         return NO_RESULT;
       }
@@ -528,7 +546,10 @@ final class TsdbQuery implements Query {
       //for (final Map.Entry<byte[], SpanGroup> entry : groups) {
       // LOG.info("group for " + Arrays.toString(entry.getKey()) + ": " + entry.getValue());
       //}
-      return groups.values().toArray(new SpanGroup[groups.size()]);
+
+      SpanGroup[] spg = groups.values().toArray(new SpanGroup[groups.size()]);
+      timerContext.stop();
+      return spg;
     }
   }
 
