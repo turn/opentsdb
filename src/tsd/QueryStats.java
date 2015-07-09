@@ -146,6 +146,14 @@ public class QueryStats {
 		collector.record("query.aggregationTimer.98thpercentile", aggregationTimer().getSnapshot().get98thPercentile());
 		collector.record("query.aggregationTimer.99thpercentile", aggregationTimer().getSnapshot().get99thPercentile());
 
+		collector.record("query.moveToNextTimer.max", moveToNext().getSnapshot().getMax());
+		collector.record("query.moveToNextTimer.min", moveToNext().getSnapshot().getMin());
+		collector.record("query.moveToNextTimer.mean", moveToNext().getSnapshot().get75thPercentile());
+		collector.record("query.moveToNextTimer.75thpercentile", moveToNext().getSnapshot().get75thPercentile());
+		collector.record("query.moveToNextTimer.95thpercentile", moveToNext().getSnapshot().get98thPercentile());
+		collector.record("query.moveToNextTimer.98thpercentile", moveToNext().getSnapshot().get98thPercentile());
+		collector.record("query.moveToNextTimer.99thpercentile", moveToNext().getSnapshot().get99thPercentile());
+
 		collector.record("query.resultProcessing.max", resultProcessing().getSnapshot().getMax());
 		collector.record("query.resultProcessing.min", resultProcessing().getSnapshot().getMin());
 		collector.record("query.resultProcessing.mean", resultProcessing().getSnapshot().get75thPercentile());
