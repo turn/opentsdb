@@ -63,6 +63,10 @@ public class QueryStats {
 		return QUERY_METRICS_REGISTRY.timer("aggregationTimer");
 	}
 
+	public static Timer moveToNext() {
+		return QUERY_METRICS_REGISTRY.timer("moveToNext");
+	}
+
 	public static Timer interpolationTimer() {
 		return QUERY_METRICS_REGISTRY.timer("interpolationTimer");
 	}

@@ -677,7 +677,6 @@ class HttpJsonSerializer extends HttpSerializer {
       return response;
     } catch (IOException e) {
       LOG.error("Unexpected exception", e);
-      timerContext.stop();
       throw new RuntimeException(e);
     } finally {
       timerContext.stop();

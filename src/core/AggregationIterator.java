@@ -20,6 +20,7 @@ import java.util.concurrent.TimeUnit;
 import com.google.common.annotations.VisibleForTesting;
 
 import net.opentsdb.core.Aggregators.Interpolation;
+import net.opentsdb.core.metrics.Timer;
 import net.opentsdb.tsd.QueryStats;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -371,67 +372,74 @@ public final class AggregationIterator implements SeekableView, DataPoint,
     QueryStats.aggregationTimer().update(aggregationTimeInNanos, TimeUnit.NANOSECONDS);
     QueryStats.interpolationTimer().update(interpolationTimeInNanos, TimeUnit.NANOSECONDS);
     QueryStats.downSampleTimer().update(downsampleTimeInNanos, TimeUnit.NANOSECONDS);
+    QueryStats.moveToNext().update(moveToNextTimeInNanos, TimeUnit.NANOSECONDS);
 
-    LOG.info("Total aggregationTime= " + (aggregationTimeInNanos / (1000 * 1000)) + "ms.");
-    LOG.info("Total interpolationTime= " + (interpolationTimeInNanos / (1000 * 1000)) + "ms.");
-    LOG.info("Total downSampleTime= " + (downsampleTimeInNanos / (1000 * 1000)) + "ms.");
+    LOG.info("Total aggregationTime=" + (aggregationTimeInNanos / (1000 * 1000)) + "ms.");
+    LOG.info("Total interpolationTime=" + (interpolationTimeInNanos / (1000 * 1000)) + "ms.");
+    LOG.info("Total downSampleTime=" + (downsampleTimeInNanos / (1000 * 1000)) + "ms.");
+    LOG.info("Total moveToNextTime=" + (moveToNextTimeInNanos / (1000 * 1000)) + "ms.");
     //LOG.debug("No hasNext (return false)");
     return false;
   }
 
   public DataPoint next() {
-    final int size = iterators.length;
-    long min_ts = Long.MAX_VALUE;
+    long moveToNextDuration = System.nanoTime();
+    try {
+      final int size = iterators.length;
+      long min_ts = Long.MAX_VALUE;
 
-    // In case we reached the end of one or more Spans, we need to make sure
-    // we mark them as such by zeroing their current timestamp.  There may
-    // be multiple Spans that reached their end at once, so check them all.
-    for (int i = current; i < size; i++) {
-      if (timestamps[i + size] == TIME_MASK) {
-        //LOG.debug("Expiring last DP for #" + current);
-        timestamps[i] = 0;
-      }
-    }
-
-    // Now we need to find which Span we'll consume next.  We'll pick the
-    // one that has the data point with the smallest timestamp since we want to
-    // return them in chronological order.
-    current = -1;
-    // If there's more than one Span with the same smallest timestamp, we'll
-    // set this to true so we can fetch the next data point in all of them at
-    // the same time.
-    boolean multiple = false;
-    for (int i = 0; i < size; i++) {
-      final long timestamp = timestamps[size + i] & TIME_MASK;
-      if (timestamp <= end_time) {
-        if (timestamp < min_ts) {
-          min_ts = timestamp;
-          current = i;
-          // We just found a new minimum so right now we can't possibly have
-          // multiple Spans with the same minimum.
-          multiple = false;
-        } else if (timestamp == min_ts) {
-          multiple = true;
+      // In case we reached the end of one or more Spans, we need to make sure
+      // we mark them as such by zeroing their current timestamp.  There may
+      // be multiple Spans that reached their end at once, so check them all.
+      for (int i = current; i < size; i++) {
+        if (timestamps[i + size] == TIME_MASK) {
+          //LOG.debug("Expiring last DP for #" + current);
+          timestamps[i] = 0;
         }
       }
-    }
-    if (current < 0) {
-      throw new NoSuchElementException("no more elements");
-    }
-    moveToNext(current);
-    if (multiple) {
-      //LOG.debug("Moving multiple DPs at time " + min_ts);
-      // We know we saw at least one other data point with the same minimum
-      // timestamp after `current', so let's move those ones too.
-      for (int i = current + 1; i < size; i++) {
+
+      // Now we need to find which Span we'll consume next.  We'll pick the
+      // one that has the data point with the smallest timestamp since we want to
+      // return them in chronological order.
+      current = -1;
+      // If there's more than one Span with the same smallest timestamp, we'll
+      // set this to true so we can fetch the next data point in all of them at
+      // the same time.
+      boolean multiple = false;
+      for (int i = 0; i < size; i++) {
         final long timestamp = timestamps[size + i] & TIME_MASK;
-        if (timestamp == min_ts) {
-          moveToNext(i);
+        if (timestamp <= end_time) {
+          if (timestamp < min_ts) {
+            min_ts = timestamp;
+            current = i;
+            // We just found a new minimum so right now we can't possibly have
+            // multiple Spans with the same minimum.
+            multiple = false;
+          } else if (timestamp == min_ts) {
+            multiple = true;
+          }
         }
       }
-    }
+      if (current < 0) {
+        throw new NoSuchElementException("no more elements");
+      }
+      moveToNext(current);
+      if (multiple) {
+        //LOG.debug("Moving multiple DPs at time " + min_ts);
+        // We know we saw at least one other data point with the same minimum
+        // timestamp after `current', so let's move those ones too.
+        for (int i = current + 1; i < size; i++) {
+          final long timestamp = timestamps[size + i] & TIME_MASK;
+          if (timestamp == min_ts) {
+            moveToNext(i);
+          }
+        }
+      }
 
-    return this;
+      return this;
+    } finally {
+      moveToNextTimeInNanos += System.nanoTime() - moveToNextDuration;
+    }
   }
 
   /**
@@ -495,6 +503,7 @@ public final class AggregationIterator implements SeekableView, DataPoint,
   long aggregationTimeInNanos = 0;
   long interpolationTimeInNanos= 0;
   long downsampleTimeInNanos = 0;
+  long moveToNextTimeInNanos = 0;
 
   public long longValue() {
     long aggregationTimeStart = System.nanoTime();
