@@ -226,6 +226,8 @@ final class GraphHandler implements HttpRpc {
     for (Query tsdbquery : tsdbqueries) {
       DataPoints[] series = tsdbquery.run();
       perTimeSeriesResults.add(series);
+      QueryStats.numQueries().inc();
+      QueryStats.numMetrics().inc(series.length);
     }
 
     List<DataPoints[]> exprResults;
@@ -233,6 +235,7 @@ final class GraphHandler implements HttpRpc {
       exprResults = Lists.newArrayList();
       List<ExpressionTree> exprs = expressionHolder.getExpressionTrees();
       if (exprs != null && exprs.size() > 0) {
+        QueryStats.numExpressions().inc(exprs.size());
         for (ExpressionTree tree : exprs) {
           try {
             exprResults.add(tree.evaluate(perTimeSeriesResults));

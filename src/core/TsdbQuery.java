@@ -444,7 +444,6 @@ final class TsdbQuery implements Query {
            }
 
            processScan.stop();
-           LOG.info("Number of scanned points: " + totalSize);
 
            return scan();
          } catch (Exception e) {
