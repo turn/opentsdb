@@ -50,20 +50,26 @@ public class Downsampler implements SeekableView, DataPoint {
   // Iterator interface //
   // ------------------ //
 
+  long totalDownsampleTime = 0;
+
   public boolean hasNext() {
-    Timer.Context context = QueryStats.downSampleTimer().time();
+    long hasNextStartTime = System.nanoTime();
     boolean b = values_in_interval.hasNextValue();
-    context.stop();
+    totalDownsampleTime += System.nanoTime() - hasNextStartTime;
     return b;
   }
 
+  public long totalTime() {
+    return totalDownsampleTime;
+  }
+
   public DataPoint next() {
+    long hasNextStartTime = System.nanoTime();
     if (hasNext()) {
-      Timer.Context context = QueryStats.downSampleTimer().time();
       value = downsampler.runDouble(values_in_interval);
       timestamp = values_in_interval.getIntervalTimestamp();
       values_in_interval.moveToNextInterval();
-      context.stop();
+      totalDownsampleTime += System.nanoTime() - hasNextStartTime;
       return this;
     }
     throw new NoSuchElementException("no more data points in " + this);
@@ -112,7 +118,7 @@ public class Downsampler implements SeekableView, DataPoint {
   public double toDouble() {
     return value;
   }
-  
+
   /** Iterates source values for an interval. */
   private static class ValuesInInterval implements Aggregator.Doubles {
 

@@ -47,6 +47,14 @@ public class QueryStats {
 		return QUERY_METRICS_REGISTRY.timer("processScan");
 	}
 
+	public static Timer hbaseScan() {
+		return QUERY_METRICS_REGISTRY.timer("hbaseScan");
+	}
+
+	public static Timer findSpans() {
+		return QUERY_METRICS_REGISTRY.timer("findSpans");
+	}
+
 	public static Timer downSampleTimer() {
 		return QUERY_METRICS_REGISTRY.timer("downSampleTimer");
 	}
@@ -63,6 +71,10 @@ public class QueryStats {
 		return QUERY_METRICS_REGISTRY.timer("interpolationTimer");
 	}
 
+	public static Timer queryExecutionTimer() {
+		return QUERY_METRICS_REGISTRY.timer("queryExecution");
+	}
+
 	public static void collectStats(StatsCollector collector) {
 
 		collector.record("query.queries.count", numQueries().getCount());
@@ -74,13 +86,29 @@ public class QueryStats {
 		collector.record("query.response.input", numberOfPointsInResponse().getCount());
 		collector.record("query.response.serialized", numberOfResponsePointsSerialized().getCount());
 
-		collector.record("query.processScan.mean", processScan().getSnapshot().getMean());
-		collector.record("query.processScan.max", processScan().getSnapshot().getMax());
-		collector.record("query.processScan.min", processScan().getSnapshot().getMin());
-		collector.record("query.processScan.75thpercentile", processScan().getSnapshot().get75thPercentile());
-		collector.record("query.processScan.95thpercentile", processScan().getSnapshot().get95thPercentile());
-		collector.record("query.processScan.98thpercentile", processScan().getSnapshot().get98thPercentile());
-		collector.record("query.processScan.99thpercentile", processScan().getSnapshot().get99thPercentile());
+		collector.record("query.perCallbackScan.mean", processScan().getSnapshot().getMean());
+		collector.record("query.perCallbackScan.max", processScan().getSnapshot().getMax());
+		collector.record("query.perCallbackScan.min", processScan().getSnapshot().getMin());
+		collector.record("query.perCallbackScan.75thpercentile", processScan().getSnapshot().get75thPercentile());
+		collector.record("query.perCallbackScan.95thpercentile", processScan().getSnapshot().get95thPercentile());
+		collector.record("query.perCallbackScan.98thpercentile", processScan().getSnapshot().get98thPercentile());
+		collector.record("query.perCallbackScan.99thpercentile", processScan().getSnapshot().get99thPercentile());
+
+		collector.record("query.hbaseRead.mean", hbaseScan().getSnapshot().getMean());
+		collector.record("query.hbaseRead.max", hbaseScan().getSnapshot().getMax());
+		collector.record("query.hbaseRead.min", hbaseScan().getSnapshot().getMin());
+		collector.record("query.hbaseRead.75thpercentile", hbaseScan().getSnapshot().get75thPercentile());
+		collector.record("query.hbaseRead.95thpercentile", hbaseScan().getSnapshot().get95thPercentile());
+		collector.record("query.hbaseRead.98thpercentile", hbaseScan().getSnapshot().get98thPercentile());
+		collector.record("query.hbaseRead.99thpercentile", hbaseScan().getSnapshot().get99thPercentile());
+
+		collector.record("query.findSpans.mean", findSpans().getSnapshot().getMean());
+		collector.record("query.findSpans.max", findSpans().getSnapshot().getMax());
+		collector.record("query.findSpans.min", findSpans().getSnapshot().getMin());
+		collector.record("query.findSpans.75thpercentile", findSpans().getSnapshot().get75thPercentile());
+		collector.record("query.findSpans.95thpercentile", findSpans().getSnapshot().get95thPercentile());
+		collector.record("query.findSpans.98thpercentile", findSpans().getSnapshot().get98thPercentile());
+		collector.record("query.findSpans.99thpercentile", findSpans().getSnapshot().get99thPercentile());
 
 		collector.record("query.groupbyTimer.max", groupByTimer().getSnapshot().getMax());
 		collector.record("query.groupbyTimer.min", groupByTimer().getSnapshot().getMin());
@@ -122,5 +150,13 @@ public class QueryStats {
 		collector.record("query.resultProcessing.98thpercentile", resultProcessing().getSnapshot().get98thPercentile());
 		collector.record("query.resultProcessing.99thpercentile", resultProcessing().getSnapshot().get99thPercentile());
 
+		collector.record("query.queryExecution.max", queryExecutionTimer().getSnapshot().getMax());
+		collector.record("query.queryExecution.min", queryExecutionTimer().getSnapshot().getMin());
+		collector.record("query.queryExecution.mean", queryExecutionTimer().getSnapshot().get75thPercentile());
+		collector.record("query.queryExecution.75thpercentile", queryExecutionTimer().getSnapshot().get75thPercentile());
+		collector.record("query.queryExecution.95thpercentile", queryExecutionTimer().getSnapshot().get98thPercentile());
+		collector.record("query.queryExecution.98thpercentile", queryExecutionTimer().getSnapshot().get98thPercentile());
+		collector.record("query.queryExecution.99thpercentile", queryExecutionTimer().getSnapshot().get99thPercentile());
 	}
+
 }
