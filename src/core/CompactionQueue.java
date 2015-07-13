@@ -25,6 +25,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import com.stumbleupon.async.Callback;
 import com.stumbleupon.async.Deferred;
 
+import net.opentsdb.tsd.QueryStats;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -332,10 +333,13 @@ final class CompactionQueue extends ConcurrentSkipListMap<byte[], Boolean> {
         return null;
       }
 
+      QueryStats.compactionColumns().update(nkvs);
+
       // go through all the columns, process annotations, and
       heap = new PriorityQueue<ColumnDatapointIterator>(nkvs);
       int tot_values = buildHeapProcessAnnotations();
 
+      boolean oneColumn = heap.size() == 1;
       // if there are no datapoints or only one that needs no fixup, we are done
       if (noMergesOrFixups()) {
         // return the single non-annotation entry if requested
@@ -359,6 +363,15 @@ final class CompactionQueue extends ConcurrentSkipListMap<byte[], Boolean> {
       // build the compacted columns
       final KeyValue compact = buildCompactedColumn(compacted_qual, compacted_val);
 
+      // if we got here and there was only one column. count it.
+      if (oneColumn) {
+        if (Arrays.equals(row.get(0).value(), compact.value())) {
+          QueryStats.uselessSort().inc();
+        } else {
+          QueryStats.usefulSort().inc();
+        }
+      }
+
       final boolean write = updateDeletesCheckForWrite(compact);
 
       if (compacted != null) {  // Caller is interested in the compacted form.
@@ -370,6 +383,7 @@ final class CompactionQueue extends ConcurrentSkipListMap<byte[], Boolean> {
           return null;              // ... Don't write back compacted.
         }
       }
+
       // if compactions aren't enabled or there is nothing to write, we're done
       if (!tsdb.config.enable_compactions() || (!write && to_delete.isEmpty())) {
         return null;

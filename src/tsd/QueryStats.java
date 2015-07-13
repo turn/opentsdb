@@ -5,6 +5,7 @@
 package net.opentsdb.tsd;
 
 import net.opentsdb.core.metrics.Counter;
+import net.opentsdb.core.metrics.Histogram;
 import net.opentsdb.core.metrics.MetricRegistry;
 import net.opentsdb.core.metrics.Timer;
 import net.opentsdb.stats.StatsCollector;
@@ -83,11 +84,26 @@ public class QueryStats {
 		return QUERY_METRICS_REGISTRY.timer("queryCompaction");
 	}
 
+	public static Counter uselessSort() {
+		return QUERY_METRICS_REGISTRY.counter("uselessCompactionSort");
+	}
+
+	public static Counter usefulSort() {
+		return QUERY_METRICS_REGISTRY.counter("usefulCompactionSort");
+	}
+
+	public static Histogram compactionColumns() {
+		return QUERY_METRICS_REGISTRY.histogram("compactionColumns");
+	}
+
 	public static void collectStats(StatsCollector collector) {
 
 		collector.record("query.queries.count", numQueries().getCount());
 		collector.record("query.metrics.count", numMetrics().getCount());
 		collector.record("query.expressions.count", numExpressions().getCount());
+
+		collector.record("query.compaction.uselessSort", uselessSort().getCount());
+		collector.record("query.compaction.usefulSort", usefulSort().getCount());
 
 		collector.record("query.scan.output", numberOfScannedPointsCounter().getCount());
 
@@ -125,6 +141,14 @@ public class QueryStats {
 		collector.record("query.queryCompaction.95thpercentile", queryCompactionTimer().getSnapshot().get95thPercentile());
 		collector.record("query.queryCompaction.98thpercentile", queryCompactionTimer().getSnapshot().get98thPercentile());
 		collector.record("query.queryCompaction.99thpercentile", queryCompactionTimer().getSnapshot().get99thPercentile());
+
+		collector.record("query.compactionColumns.mean", compactionColumns().getSnapshot().getMean());
+		collector.record("query.compactionColumns.max", compactionColumns().getSnapshot().getMax());
+		collector.record("query.compactionColumns.min", compactionColumns().getSnapshot().getMin());
+		collector.record("query.compactionColumns.75thpercentile", compactionColumns().getSnapshot().get75thPercentile());
+		collector.record("query.compactionColumns.95thpercentile", compactionColumns().getSnapshot().get95thPercentile());
+		collector.record("query.compactionColumns.98thpercentile", compactionColumns().getSnapshot().get98thPercentile());
+		collector.record("query.compactionColumns.99thpercentile", compactionColumns().getSnapshot().get99thPercentile());
 
 		collector.record("query.groupbyTimer.max", groupByTimer().getSnapshot().getMax());
 		collector.record("query.groupbyTimer.min", groupByTimer().getSnapshot().getMin());
