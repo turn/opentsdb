@@ -372,7 +372,10 @@ final class TsdbQuery implements Query {
       int hbase_time = 0; // milliseconds.
       long starttime = System.nanoTime();
       long timeout = tsdb.getConfig().getLong("tsd.query.timeout");
-      
+
+
+      long totalCompactionTime = 0;
+
       /**
       * Starts the scanner and is called recursively to fetch the next set of
       * rows from the scanner.
@@ -403,8 +406,9 @@ final class TsdbQuery implements Query {
              LOG.info(TsdbQuery.this + " matched " + nrows + " rows in " +
                      spans.size() + " spans in " + hbase_time + "ms");
 
-             LOG.info("hbase scan latency=" + hbase_time + "ms.");
+             LOG.info("hbase scan latency={} ms, compaction latency={} ms", hbase_time, totalCompactionTime / (1000 * 1000));
              QueryStats.hbaseScan().update(hbase_time, TimeUnit.MILLISECONDS);
+             QueryStats.queryCompactionTimer().update(totalCompactionTime, TimeUnit.NANOSECONDS);
 
              if (nrows < 1 && !seenAnnotation) {
                results.callback(null);
@@ -439,8 +443,11 @@ final class TsdbQuery implements Query {
              QueryStats.numberOfScannedPointsCounter().inc(size);
              totalSize += size;
 
-             final KeyValue compacted = 
-               tsdb.compact(row, datapoints.getAnnotations());
+             long compactionTimeStart = System.nanoTime();
+             // LOG.info("Compacting metric={}, tags={}", RowKey.metricName(tsdb, key), Tags.getTags(tsdb, key));
+             final KeyValue compacted = tsdb.compact(row, datapoints.getAnnotations());
+             totalCompactionTime += (System.nanoTime() - compactionTimeStart);
+
              seenAnnotation |= !datapoints.getAnnotations().isEmpty();
              if (compacted != null) { // Can be null if we ignored all KVs.
                datapoints.addRow(compacted);

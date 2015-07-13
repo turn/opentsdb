@@ -79,6 +79,10 @@ public class QueryStats {
 		return QUERY_METRICS_REGISTRY.timer("queryExecution");
 	}
 
+	public static Timer queryCompactionTimer() {
+		return QUERY_METRICS_REGISTRY.timer("queryCompaction");
+	}
+
 	public static void collectStats(StatsCollector collector) {
 
 		collector.record("query.queries.count", numQueries().getCount());
@@ -113,6 +117,14 @@ public class QueryStats {
 		collector.record("query.findSpans.95thpercentile", findSpans().getSnapshot().get95thPercentile());
 		collector.record("query.findSpans.98thpercentile", findSpans().getSnapshot().get98thPercentile());
 		collector.record("query.findSpans.99thpercentile", findSpans().getSnapshot().get99thPercentile());
+
+		collector.record("query.queryCompaction.mean", queryCompactionTimer().getSnapshot().getMean());
+		collector.record("query.queryCompaction.max", queryCompactionTimer().getSnapshot().getMax());
+		collector.record("query.queryCompaction.min", queryCompactionTimer().getSnapshot().getMin());
+		collector.record("query.queryCompaction.75thpercentile", queryCompactionTimer().getSnapshot().get75thPercentile());
+		collector.record("query.queryCompaction.95thpercentile", queryCompactionTimer().getSnapshot().get95thPercentile());
+		collector.record("query.queryCompaction.98thpercentile", queryCompactionTimer().getSnapshot().get98thPercentile());
+		collector.record("query.queryCompaction.99thpercentile", queryCompactionTimer().getSnapshot().get99thPercentile());
 
 		collector.record("query.groupbyTimer.max", groupByTimer().getSnapshot().getMax());
 		collector.record("query.groupbyTimer.min", groupByTimer().getSnapshot().getMin());

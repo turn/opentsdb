@@ -374,10 +374,10 @@ public final class AggregationIterator implements SeekableView, DataPoint,
     QueryStats.downSampleTimer().update(downsampleTimeInNanos, TimeUnit.NANOSECONDS);
     QueryStats.moveToNext().update(moveToNextTimeInNanos, TimeUnit.NANOSECONDS);
 
-    LOG.info("Total aggregationTime=" + (aggregationTimeInNanos / (1000 * 1000)) + "ms.");
-    LOG.info("Total interpolationTime=" + (interpolationTimeInNanos / (1000 * 1000)) + "ms.");
-    LOG.info("Total downSampleTime=" + (downsampleTimeInNanos / (1000 * 1000)) + "ms.");
-    LOG.info("Total moveToNextTime=" + (moveToNextTimeInNanos / (1000 * 1000)) + "ms.");
+    LOG.debug("Total aggregationTime=" + (aggregationTimeInNanos / (1000 * 1000)) + "ms.");
+    LOG.debug("Total interpolationTime=" + (interpolationTimeInNanos / (1000 * 1000)) + "ms.");
+    LOG.debug("Total downSampleTime=" + (downsampleTimeInNanos / (1000 * 1000)) + "ms.");
+    LOG.debug("Total moveToNextTime=" + (moveToNextTimeInNanos / (1000 * 1000)) + "ms.");
     //LOG.debug("No hasNext (return false)");
     return false;
   }
