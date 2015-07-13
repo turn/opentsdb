@@ -76,7 +76,7 @@ final class QueryRpc implements HttpRpc {
     throws IOException {
 
     Timer.Context queryExecutionTimer = QueryStats.queryExecutionTimer().time();
-
+    TSQuery data_query = null;
     try {
       // only accept GET/POST
       if (query.method() != HttpMethod.GET && query.method() != HttpMethod.POST) {
@@ -92,11 +92,11 @@ final class QueryRpc implements HttpRpc {
         handleLastDataPointQuery(tsdb, query);
         return;
       } else {
-        handleQuery(tsdb, query);
+        data_query = handleQuery(tsdb, query);
       }
     } finally {
       long elapsed = queryExecutionTimer.stop();
-      LOG.info("Took " + (elapsed / (1000 * 1000)) + "ms to process query.");
+      LOG.info("Took " + (elapsed / (1000 * 1000)) + "ms to process query=" + data_query);
     }
 
   }
@@ -106,7 +106,7 @@ final class QueryRpc implements HttpRpc {
    * @param tsdb The TSDB to which we belong
    * @param query The HTTP query to parse/respond
    */
-  private void handleQuery(final TSDB tsdb, final HttpQuery query) {
+  private TSQuery handleQuery(final TSDB tsdb, final HttpQuery query) {
     final TSQuery data_query;
     if (query.method() == HttpMethod.POST) {
       switch (query.apiVersion()) {
@@ -213,6 +213,8 @@ final class QueryRpc implements HttpRpc {
           "Requested API version not implemented", "Version " + 
           query.apiVersion() + " is not implemented");
     }
+
+    return data_query;
   }
   
   /**
