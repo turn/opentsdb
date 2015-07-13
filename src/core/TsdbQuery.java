@@ -12,6 +12,7 @@
 // see <http://www.gnu.org/licenses/>.
 package net.opentsdb.core;
 
+import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -372,6 +373,7 @@ final class TsdbQuery implements Query {
       int hbase_time = 0; // milliseconds.
       long starttime = System.nanoTime();
       long timeout = tsdb.getConfig().getLong("tsd.query.timeout");
+      long compactionTime = 0;
       
       /**
       * Starts the scanner and is called recursively to fetch the next set of
@@ -400,11 +402,14 @@ final class TsdbQuery implements Query {
            if (rows == null) {
              hbase_time += (System.nanoTime() - starttime) / 1000000;
              scanlatency.add(hbase_time);
-             LOG.info(TsdbQuery.this + " matched " + nrows + " rows in " +
+             LOG.info("Matched " + nrows + " rows in " +
                      spans.size() + " spans in " + hbase_time + "ms");
 
-             LOG.info("hbase scan latency=" + hbase_time + "ms.");
+             LOG.info("hbase scan latency={} ms. Compaction time={} ms.",
+                     hbase_time,
+                     compactionTime / (1000 * 1000));
              QueryStats.hbaseScan().update(hbase_time, TimeUnit.MILLISECONDS);
+             QueryStats.compaction().update(compactionTime, TimeUnit.NANOSECONDS);
 
              if (nrows < 1 && !seenAnnotation) {
                results.callback(null);
@@ -419,9 +424,13 @@ final class TsdbQuery implements Query {
              throw new InterruptedException("Query timeout exceeded!");
            }
 
-           int totalSize = 0;
+           LOG.info("Total number of rows {}, hbase_time={}, compactionTime={}"
+                   , rows.size(), hbase_time, compactionTime / (1000 * 1000));
            for (final ArrayList<KeyValue> row : rows) {
              final byte[] key = row.get(0).key();
+             LOG.info("findSpans metric={}, tags={} ts={}, row={}", RowKey.metricName(tsdb, key),
+                     Tags.getTags(tsdb, key), Bytes.getInt(key, 4), Arrays.toString(key));
+
              if (Bytes.memcmp(metric, key, 0, metric_width) != 0) {
                scanner.close();
                throw new IllegalDataException(
@@ -435,12 +444,9 @@ final class TsdbQuery implements Query {
                spans.put(key, datapoints);
              }
 
-             int size = datapoints.size();
-             QueryStats.numberOfScannedPointsCounter().inc(size);
-             totalSize += size;
-
-             final KeyValue compacted = 
-               tsdb.compact(row, datapoints.getAnnotations());
+             long compactionTimeStart = System.nanoTime();
+             final KeyValue compacted = tsdb.compact(row, datapoints.getAnnotations());
+             compactionTime += (System.nanoTime() - compactionTimeStart);
              seenAnnotation |= !datapoints.getAnnotations().isEmpty();
              if (compacted != null) { // Can be null if we ignored all KVs.
                datapoints.addRow(compacted);
@@ -487,10 +493,14 @@ final class TsdbQuery implements Query {
     @Override
     public DataPoints[] call(final TreeMap<byte[], Span> spans) throws Exception {
       long findSpansDuration = (System.nanoTime() - findSpansStartTime);
-      LOG.info("Starting GroupByAndAggregateCB. findSpans() took= "
-              + (findSpansDuration / (1000 * 1000)) + "ms.");
+
       QueryStats.findSpans().update(findSpansDuration, TimeUnit.NANOSECONDS);
+      LOG.info("Starting GroupByAndAggregateCB. findSpans() took={} ms. Sizeof Spans={}",
+              findSpansDuration / (1000 * 1000),
+              (spans == null) ? 0 : spans.size());
+
       Timer.Context groupByTimer = QueryStats.groupByTimer().time();
+
       try {
         if (spans == null || spans.size() <= 0) {
           return NO_RESULT;
@@ -524,8 +534,11 @@ final class TsdbQuery implements Query {
         final byte[] group = new byte[group_bys.size() * value_width];
         for (final Map.Entry<byte[], Span> entry : spans.entrySet()) {
           final byte[] row = entry.getKey();
+          LOG.info("metricName={}, tags={} ts={}, row={}", RowKey.metricName(tsdb, row),
+                  Tags.getTags(tsdb, row), Bytes.getInt(row, 4), Arrays.toString(row));
           byte[] value_id = null;
           int i = 0;
+
           // TODO(tsuna): The following loop has a quadratic behavior. We can
           // make it much better since both the row key and group_bys are sorted.
           for (final byte[] tag_id : group_bys) {
@@ -560,6 +573,12 @@ final class TsdbQuery implements Query {
         //for (final Map.Entry<byte[], SpanGroup> entry : groups) {
         // LOG.info("group for " + Arrays.toString(entry.getKey()) + ": " + entry.getValue());
         //}
+
+        String grStr="";
+        for (byte[] gr: groups.keySet()) {
+          grStr += Arrays.toString(gr) + " ";
+        }
+        LOG.info("Groups=" + grStr);
 
         return groups.values().toArray(new SpanGroup[groups.size()]);
       } finally {
@@ -606,6 +625,7 @@ final class TsdbQuery implements Query {
     }
 
     final Scanner scanner = tsdb.client.newScanner(tsdb.table);
+//    scanner.setMaxNumRows(Scanner.DEFAULT_MAX_NUM_ROWS * 4);
     scanner.setStartKey(start_row);
     scanner.setStopKey(end_row);
     if (tsuids != null && !tsuids.isEmpty()) {

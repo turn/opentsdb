@@ -13,6 +13,7 @@
 package net.opentsdb.tsd;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -21,7 +22,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.fasterxml.jackson.core.JsonGenerator;
 import com.google.common.collect.Lists;
+import net.opentsdb.core.DataPoint;
 import net.opentsdb.core.metrics.Timer;
 import net.opentsdb.tsd.expression.ExpressionTree;
 import net.opentsdb.tsd.expression.Expressions;
@@ -29,6 +32,8 @@ import net.opentsdb.tsd.expression.parser.ParseException;
 import net.opentsdb.tsd.expression.parser.SyntaxChecker;
 import org.hbase.async.Bytes.ByteMap;
 import org.jboss.netty.buffer.ChannelBuffer;
+import org.jboss.netty.buffer.ChannelBufferOutputStream;
+import org.jboss.netty.buffer.ChannelBuffers;
 import org.jboss.netty.handler.codec.http.HttpMethod;
 import org.jboss.netty.handler.codec.http.HttpResponseStatus;
 import org.slf4j.Logger;
@@ -204,14 +209,175 @@ final class QueryRpc implements HttpRpc {
         query.sendReply(query.serializer().formatQueryV1(data_query, exprResults,
                 globals, data_query.getExpressionTrees()));
       } else {
-        query.sendReply(query.serializer().formatQueryV1(data_query, results,
-                globals));
+        // query.sendReply(query.serializer().formatQueryV1(data_query, results, globals));
+        query.sendReply(formatQueryV1ForInstrumentation(query, data_query, results, globals));
       }
       break;
     default: 
       throw new BadRequestException(HttpResponseStatus.NOT_IMPLEMENTED, 
           "Requested API version not implemented", "Version " + 
           query.apiVersion() + " is not implemented");
+    }
+  }
+
+  class Result {
+    public Result(long timestamp, double value) {
+      this.timestamp = timestamp;
+      this.value = value;
+    }
+
+    long timestamp;
+    double value;
+  }
+
+  public ChannelBuffer formatQueryV1ForInstrumentation(final HttpQuery query,
+                                                       final TSQuery data_query,
+                                                       final List<DataPoints[]> results,
+                                                       final List<Annotation> globals) {
+
+    final long formatQueryStartTime = System.nanoTime();
+    long bufferResultsTime = 0;
+
+    final boolean as_arrays = query.hasQueryStringParam("arrays");
+    final String jsonp = query.getQueryStringParam("jsonp");
+
+    // todo - this should be streamed at some point since it could be HUGE
+    final ChannelBuffer response = ChannelBuffers.dynamicBuffer();
+    final OutputStream output = new ChannelBufferOutputStream(response);
+
+    Timer.Context timerContext = QueryStats.resultProcessing().time();
+
+    List<Result> dpResults = new ArrayList<Result>();
+
+    try {
+      // don't forget jsonp
+      if (jsonp != null && !jsonp.isEmpty()) {
+        output.write((jsonp + "(").getBytes(query.getCharset()));
+      }
+      JsonGenerator json = JSON.getFactory().createGenerator(output);
+      json.writeStartArray();
+
+      for (DataPoints[] separate_dps : results) {
+        for (DataPoints dps : separate_dps) {
+
+          //////////////////////////////////////////////////////////////////////////////////////
+          long bufferResultStart = System.nanoTime();
+          for (final DataPoint dp : dps) {
+            QueryStats.numberOfPointsInResponse().inc();
+            if (dp.timestamp() < data_query.startTime() ||
+                    dp.timestamp() > data_query.endTime()) {
+              continue;
+            }
+            QueryStats.numberOfResponsePointsSerialized().inc();
+            final long timestamp = data_query.getMsResolution() ?
+                    dp.timestamp() : dp.timestamp() / 1000;
+            if (dp.isInteger()) {
+              dpResults.add(new Result(timestamp, dp.longValue()));
+            } else {
+              dpResults.add(new Result(timestamp, dp.doubleValue()));
+            }
+          }
+          bufferResultsTime += (System.nanoTime() - bufferResultStart);
+          //////////////////////////////////////////////////////////////////////////////////////
+
+          json.writeStartObject();
+
+          json.writeStringField("metric", dps.metricName());
+
+          json.writeFieldName("tags");
+          json.writeStartObject();
+          if (dps.getTags() != null) {
+            for (Map.Entry<String, String> tag : dps.getTags().entrySet()) {
+              json.writeStringField(tag.getKey(), tag.getValue());
+            }
+          }
+          json.writeEndObject();
+
+          json.writeFieldName("aggregateTags");
+          json.writeStartArray();
+          if (dps.getAggregatedTags() != null) {
+            for (String atag : dps.getAggregatedTags()) {
+              json.writeString(atag);
+            }
+          }
+          json.writeEndArray();
+
+          if (data_query.getShowTSUIDs()) {
+            json.writeFieldName("tsuids");
+            json.writeStartArray();
+            final List<String> tsuids = dps.getTSUIDs();
+            Collections.sort(tsuids);
+            for (String tsuid : tsuids) {
+              json.writeString(tsuid);
+            }
+            json.writeEndArray();
+          }
+
+          if (!data_query.getNoAnnotations()) {
+            final List<Annotation> annotations = dps.getAnnotations();
+            if (annotations != null) {
+              Collections.sort(annotations);
+              json.writeArrayFieldStart("annotations");
+              for (Annotation note : annotations) {
+                json.writeObject(note);
+              }
+              json.writeEndArray();
+            }
+
+            if (globals != null && !globals.isEmpty()) {
+              Collections.sort(globals);
+              json.writeArrayFieldStart("globalAnnotations");
+              for (Annotation note : globals) {
+                json.writeObject(note);
+              }
+              json.writeEndArray();
+            }
+          }
+
+          // now the fun stuff, dump the data
+          json.writeFieldName("dps");
+
+          // default is to write a map, otherwise write arrays
+          if (as_arrays) {
+            json.writeStartArray();
+            for (final Result dp : dpResults) {
+              json.writeStartArray();
+              json.writeNumber(dp.timestamp);
+              json.writeNumber(dp.value);
+              json.writeEndArray();
+            }
+            json.writeEndArray();
+          } else {
+            json.writeStartObject();
+            for (final Result dp : dpResults) {
+              json.writeNumberField(Long.toString(dp.timestamp), dp.value);
+            }
+            json.writeEndObject();
+          }
+
+          // close the results for this particular query
+          json.writeEndObject();
+        }
+      }
+
+      // close
+      json.writeEndArray();
+      json.close();
+
+      if (jsonp != null && !jsonp.isEmpty()) {
+        output.write(")".getBytes());
+      }
+
+      return response;
+    } catch (IOException e) {
+      LOG.error("Unexpected exception", e);
+      throw new RuntimeException(e);
+    } finally {
+      timerContext.stop();
+      LOG.info("Total time to buffer results=" + (bufferResultsTime/(1000 * 1000)) + "ms.");
+      long totalTime = (System.nanoTime() - formatQueryStartTime);
+      LOG.info("Total time to format results=" + ((totalTime - bufferResultsTime)/(1000 * 1000)) + "ms.");
+      LOG.info("Total time to buffer and format results=" + (totalTime/(1000 * 1000)) + "ms.");
     }
   }
   

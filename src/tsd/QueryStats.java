@@ -55,6 +55,10 @@ public class QueryStats {
 		return QUERY_METRICS_REGISTRY.timer("findSpans");
 	}
 
+	public static Timer compaction() {
+		return QUERY_METRICS_REGISTRY.timer("compaction");
+	}
+
 	public static Timer downSampleTimer() {
 		return QUERY_METRICS_REGISTRY.timer("downSampleTimer");
 	}
@@ -113,6 +117,14 @@ public class QueryStats {
 		collector.record("query.findSpans.95thpercentile", findSpans().getSnapshot().get95thPercentile());
 		collector.record("query.findSpans.98thpercentile", findSpans().getSnapshot().get98thPercentile());
 		collector.record("query.findSpans.99thpercentile", findSpans().getSnapshot().get99thPercentile());
+
+		collector.record("query.compaction.mean", compaction().getSnapshot().getMean());
+		collector.record("query.compaction.max", compaction().getSnapshot().getMax());
+		collector.record("query.compaction.min", compaction().getSnapshot().getMin());
+		collector.record("query.compaction.75thpercentile", compaction().getSnapshot().get75thPercentile());
+		collector.record("query.compaction.95thpercentile", compaction().getSnapshot().get95thPercentile());
+		collector.record("query.compaction.98thpercentile", compaction().getSnapshot().get98thPercentile());
+		collector.record("query.compaction.99thpercentile", compaction().getSnapshot().get99thPercentile());
 
 		collector.record("query.groupbyTimer.max", groupByTimer().getSnapshot().getMax());
 		collector.record("query.groupbyTimer.min", groupByTimer().getSnapshot().getMin());

@@ -152,7 +152,11 @@ public final class TSDB {
     }
     LOG.debug(config.dumpConfiguration());
   }
-  
+
+  public UniqueId metrics() {
+    return metrics;
+  }
+
   /**
    * Constructor
    * @param config An initialized configuration object
