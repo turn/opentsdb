@@ -606,6 +606,7 @@ final class TsdbQuery implements Query {
     }
 
     final Scanner scanner = tsdb.client.newScanner(tsdb.table);
+    scanner.setMaxNumRows(tsdb.config.getHbaseClient_maxNumRows());
     scanner.setStartKey(start_row);
     scanner.setStopKey(end_row);
     if (tsuids != null && !tsuids.isEmpty()) {
