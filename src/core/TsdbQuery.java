@@ -447,7 +447,7 @@ final class TsdbQuery implements Query {
              // LOG.info("Compacting metric={}, tags={}", RowKey.metricName(tsdb, key), Tags.getTags(tsdb, key));
              final KeyValue compacted = tsdb.compact(row, datapoints.getAnnotations());
              totalCompactionTime += (System.nanoTime() - compactionTimeStart);
-             LOG.info("Single compaction step took {} us.", (System.nanoTime() - compactionTimeStart) / 1000);
+             LOG.debug("Single compaction step took {} us.", (System.nanoTime() - compactionTimeStart) / 1000);
 
              seenAnnotation |= !datapoints.getAnnotations().isEmpty();
              if (compacted != null) { // Can be null if we ignored all KVs.
