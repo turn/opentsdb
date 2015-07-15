@@ -409,7 +409,6 @@ final class TsdbQuery implements Query {
              LOG.info("hbase scan latency={} ms, compaction latency={} ms", hbase_time, totalCompactionTime / (1000 * 1000));
              QueryStats.hbaseScan().update(hbase_time, TimeUnit.MILLISECONDS);
              QueryStats.queryCompactionTimer().update(totalCompactionTime, TimeUnit.NANOSECONDS);
-
              if (nrows < 1 && !seenAnnotation) {
                results.callback(null);
              } else {
@@ -447,7 +446,7 @@ final class TsdbQuery implements Query {
              // LOG.info("Compacting metric={}, tags={}", RowKey.metricName(tsdb, key), Tags.getTags(tsdb, key));
              final KeyValue compacted = tsdb.compact(row, datapoints.getAnnotations());
              totalCompactionTime += (System.nanoTime() - compactionTimeStart);
-             LOG.debug("Single compaction step took {} us.", (System.nanoTime() - compactionTimeStart) / 1000);
+             // LOG.debug("Single compaction step took {} us.", (System.nanoTime() - compactionTimeStart) / 1000);
 
              seenAnnotation |= !datapoints.getAnnotations().isEmpty();
              if (compacted != null) { // Can be null if we ignored all KVs.
