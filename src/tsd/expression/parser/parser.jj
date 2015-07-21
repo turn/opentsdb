@@ -60,5 +60,5 @@ String METRIC()    :  {Token agg,itvl,rate,metric,tagk,tagv; StringBuilder build
                         (rate=<NAME> ":" { builder.append(rate.image).append(":"); })?
                         metric=<NAME> { builder.append(metric.image); }
                         ("{" tagk=<NAME> "=" tagv=<NAME> {tagPairs.add(tagk+"="+tagv);}
-                             ("," tagk=<NAME> "=" tagv=<NAME>)* {tagPairs.add(tagk+"="+tagv);} "}")?
+                             ("," tagk=<NAME> "=" tagv=<NAME> {tagPairs.add(tagk+"="+tagv);})* "}")?
                              {if (tagPairs.size() > 0) builder.append("{").append(JOINER.join(tagPairs)).append("}"); return builder.toString();} }

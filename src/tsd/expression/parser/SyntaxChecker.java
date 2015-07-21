@@ -98,7 +98,7 @@ public class SyntaxChecker implements SyntaxCheckerConstants {
       tagk = jj_consume_token(NAME);
       jj_consume_token(12);
       tagv = jj_consume_token(NAME);
-                                                          tagPairs.add(tagk+"="+tagv);
+                                                          tagPairs.add(tagk+"="+tagv); System.out.println(">>inparser " + tagk + "=" + tagv);
       label_2:
       while (true) {
         if (jj_2_7(5)) {
@@ -110,8 +110,8 @@ public class SyntaxChecker implements SyntaxCheckerConstants {
         tagk = jj_consume_token(NAME);
         jj_consume_token(12);
         tagv = jj_consume_token(NAME);
+                                                               tagPairs.add(tagk+"="+tagv); System.out.println(">>inparser " + tagk + "=" + tagv);
       }
-                                                                 tagPairs.add(tagk+"="+tagv);
       jj_consume_token(13);
     } else {
       ;
