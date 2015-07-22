@@ -20,6 +20,7 @@ import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -99,7 +100,16 @@ public class Config {
 
   /** tsd.storage.hbaseclient.maxNumRows */
   private int hbaseclient_maxNumRows = 128;
-  
+
+  /** tsd.queryprocessing.parallel_scan.enable */
+  private boolean parallel_scan_enable = false;
+
+  /** tsd.queryprocessing.parallel_scan.threshold_in_seconds */
+  private long parallel_scan_threshold_in_seconds = Long.MAX_VALUE;
+
+  /** tsd.queryprocessing.parallel_scan.bucket_size */
+  private long parallel_scan_bucket_size = 3600;
+
   /**
    * The list of properties configured to their defaults or modified by users
    */
@@ -112,6 +122,7 @@ public class Config {
   
   /** Tracks the location of the file that was actually loaded */
   protected String config_location;
+
 
   /**
    * Constructor that initializes default configuration values. May attempt to
@@ -468,6 +479,9 @@ public class Config {
     default_map.put("tsd.search.plugin", "");
     default_map.put("tsd.stats.canonical", "false");
     default_map.put("tsd.storage.hbaseclient.maxNumRows", "768");
+    default_map.put("tsd.queryprocessing.parallel_scan.enable", "false");
+    default_map.put("tsd.queryprocessing.parallel_scan.threshold",
+            String.valueOf(TimeUnit.SECONDS.convert(365, TimeUnit.DAYS)));
     default_map.put("tsd.storage.fix_duplicates", "false");
     default_map.put("tsd.storage.flush_interval", "1000");
     default_map.put("tsd.storage.hbase.data_table", "tsdb");
@@ -601,6 +615,9 @@ public class Config {
     fix_duplicates = this.getBoolean("tsd.storage.fix_duplicates");
     hbaseclient_maxNumRows = this.getInt("tsd.storage.hbaseclient.maxNumRows");
 
+    parallel_scan_enable = this.getBoolean("tsd.queryprocessing.parallel_scan.enable");
+    parallel_scan_threshold_in_seconds = this.getLong("tsd.queryprocessing.parallel_scan.threshold");
+    parallel_scan_bucket_size = this.getLong("tsd.queryprocessing.parallel_scan.bucket_size");
   }
   
   /**
@@ -619,5 +636,17 @@ public class Config {
       String key = (String) e.nextElement();
       properties.put(key, props.getProperty(key));
     }
+  }
+
+  public boolean parallel_scan_enable() {
+    return parallel_scan_enable;
+  }
+
+  public long parallel_scan_threshold_in_seconds() {
+    return parallel_scan_threshold_in_seconds;
+  }
+
+  public long parallel_size_bucket_size() {
+    return parallel_scan_bucket_size;
   }
 }
