@@ -39,6 +39,7 @@ import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.google.common.collect.Lists;
 import net.opentsdb.core.TSQuery;
+import net.opentsdb.core.metrics.Timer;
 import net.opentsdb.tsd.expression.ExpressionTree;
 import net.opentsdb.tsd.expression.parser.ParseException;
 import net.opentsdb.tsd.expression.parser.SyntaxChecker;
@@ -113,6 +114,12 @@ final class GraphHandler implements HttpRpc {
   }
 
   public void execute(final TSDB tsdb, final HttpQuery query) {
+
+    float f1 = Float.parseFloat("0.35");
+    float f2 = Float.parseFloat("0.65");
+    float n = Float.parseFloat("0.00035");
+    LOG.info("result = " + (n / (1 - (f2 + f1 + 0))));
+
     if (!query.hasQueryStringParam("json")
         && !query.hasQueryStringParam("png")
         && !query.hasQueryStringParam("ascii")) {
@@ -125,12 +132,16 @@ final class GraphHandler implements HttpRpc {
       query.redirect(uri);
       return;
     }
+    Timer.Context queryExecutionTimer = QueryStats.queryExecutionTimer().time();
     try {
       doGraph(tsdb, query);
     } catch (IOException e) {
       query.internalError(e);
     } catch (IllegalArgumentException e) {
       query.badRequest(e.getMessage());
+    } finally {
+      long elapsed = queryExecutionTimer.stop();
+      LOG.info("Took " + (elapsed / (1000 * 1000)) + "ms to process query.");
     }
   }
 
@@ -219,6 +230,8 @@ final class GraphHandler implements HttpRpc {
     for (Query tsdbquery : tsdbqueries) {
       DataPoints[] series = tsdbquery.run();
       perTimeSeriesResults.add(series);
+      QueryStats.numQueries().inc();
+      QueryStats.numMetrics().inc(series.length);
     }
 
     List<DataPoints[]> exprResults;
@@ -226,6 +239,7 @@ final class GraphHandler implements HttpRpc {
       exprResults = Lists.newArrayList();
       List<ExpressionTree> exprs = expressionHolder.getExpressionTrees();
       if (exprs != null && exprs.size() > 0) {
+        QueryStats.numExpressions().inc(exprs.size());
         for (ExpressionTree tree : exprs) {
           try {
             exprResults.add(tree.evaluate(perTimeSeriesResults));

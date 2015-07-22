@@ -39,7 +39,7 @@ public class SyntaxChecker implements SyntaxCheckerConstants {
     PARAMETER(tree, paramIndex++);
     label_1:
     while (true) {
-      if (jj_2_1(2)) {
+      if (jj_2_1(5)) {
         ;
       } else {
         break label_1;
@@ -54,13 +54,13 @@ public class SyntaxChecker implements SyntaxCheckerConstants {
 
   final public void PARAMETER(ExpressionTree tree, int paramIndex) throws ParseException {
                                                        String metric; Token param; ExpressionTree subTree;
-    if (jj_2_2(2)) {
+    if (jj_2_2(5)) {
       subTree = EXPRESSION();
                               tree.addSubExpression(subTree, paramIndex);
-    } else if (jj_2_3(2)) {
+    } else if (jj_2_3(5)) {
       metric = METRIC();
                          metricQueries.add(metric); tree.addSubMetricQuery(metric, metricQueries.size()-1, paramIndex);
-    } else if (jj_2_4(2)) {
+    } else if (jj_2_4(5)) {
       param = jj_consume_token(NAME);
                       tree.addFunctionParameter(param.image);
     } else {
@@ -77,14 +77,14 @@ public class SyntaxChecker implements SyntaxCheckerConstants {
     agg = jj_consume_token(NAME);
     jj_consume_token(10);
                                             builder.append(agg.image).append(":");
-    if (jj_2_5(2)) {
+    if (jj_2_5(5)) {
       itvl = jj_consume_token(NAME);
       jj_consume_token(10);
                                            builder.append(itvl.image).append(":");
     } else {
       ;
     }
-    if (jj_2_6(2)) {
+    if (jj_2_6(5)) {
       rate = jj_consume_token(NAME);
       jj_consume_token(10);
                                            builder.append(rate.image).append(":");
@@ -93,15 +93,15 @@ public class SyntaxChecker implements SyntaxCheckerConstants {
     }
     metric = jj_consume_token(NAME);
                                         builder.append(metric.image);
-    if (jj_2_8(2)) {
+    if (jj_2_8(5)) {
       jj_consume_token(11);
       tagk = jj_consume_token(NAME);
       jj_consume_token(12);
       tagv = jj_consume_token(NAME);
-                                                          tagPairs.add(tagk+"="+tagv);
+                                                          tagPairs.add(tagk+"="+tagv); System.out.println(">>inparser " + tagk + "=" + tagv);
       label_2:
       while (true) {
-        if (jj_2_7(2)) {
+        if (jj_2_7(5)) {
           ;
         } else {
           break label_2;
@@ -110,8 +110,8 @@ public class SyntaxChecker implements SyntaxCheckerConstants {
         tagk = jj_consume_token(NAME);
         jj_consume_token(12);
         tagv = jj_consume_token(NAME);
+                                                               tagPairs.add(tagk+"="+tagv); System.out.println(">>inparser " + tagk + "=" + tagv);
       }
-                                                                 tagPairs.add(tagk+"="+tagv);
       jj_consume_token(13);
     } else {
       ;
@@ -179,6 +179,14 @@ public class SyntaxChecker implements SyntaxCheckerConstants {
   private boolean jj_3_8() {
     if (jj_scan_token(11)) return true;
     if (jj_scan_token(NAME)) return true;
+    if (jj_scan_token(12)) return true;
+    if (jj_scan_token(NAME)) return true;
+    Token xsp;
+    while (true) {
+      xsp = jj_scanpos;
+      if (jj_3_7()) { jj_scanpos = xsp; break; }
+    }
+    if (jj_scan_token(13)) return true;
     return false;
   }
 
@@ -203,6 +211,14 @@ public class SyntaxChecker implements SyntaxCheckerConstants {
   private boolean jj_3R_5() {
     if (jj_scan_token(NAME)) return true;
     if (jj_scan_token(10)) return true;
+    Token xsp;
+    xsp = jj_scanpos;
+    if (jj_3_5()) jj_scanpos = xsp;
+    xsp = jj_scanpos;
+    if (jj_3_6()) jj_scanpos = xsp;
+    if (jj_scan_token(NAME)) return true;
+    xsp = jj_scanpos;
+    if (jj_3_8()) jj_scanpos = xsp;
     return false;
   }
 
@@ -237,11 +253,20 @@ public class SyntaxChecker implements SyntaxCheckerConstants {
   private boolean jj_3R_4() {
     if (jj_scan_token(NAME)) return true;
     if (jj_scan_token(7)) return true;
+    if (jj_3R_3()) return true;
+    Token xsp;
+    while (true) {
+      xsp = jj_scanpos;
+      if (jj_3_1()) { jj_scanpos = xsp; break; }
+    }
+    if (jj_scan_token(9)) return true;
     return false;
   }
 
   private boolean jj_3_7() {
     if (jj_scan_token(8)) return true;
+    if (jj_scan_token(NAME)) return true;
+    if (jj_scan_token(12)) return true;
     if (jj_scan_token(NAME)) return true;
     return false;
   }

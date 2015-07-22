@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.google.common.collect.Lists;
+import net.opentsdb.core.metrics.Timer;
 import net.opentsdb.tsd.expression.ExpressionTree;
 import net.opentsdb.tsd.expression.Expressions;
 import net.opentsdb.tsd.expression.parser.ParseException;
@@ -73,23 +74,31 @@ final class QueryRpc implements HttpRpc {
   @Override
   public void execute(final TSDB tsdb, final HttpQuery query) 
     throws IOException {
-    
-    // only accept GET/POST
-    if (query.method() != HttpMethod.GET && query.method() != HttpMethod.POST) {
-      throw new BadRequestException(HttpResponseStatus.METHOD_NOT_ALLOWED, 
-          "Method not allowed", "The HTTP method [" + query.method().getName() +
-          "] is not permitted for this endpoint");
+
+    Timer.Context queryExecutionTimer = QueryStats.queryExecutionTimer().time();
+    TSQuery data_query = null;
+    try {
+      // only accept GET/POST
+      if (query.method() != HttpMethod.GET && query.method() != HttpMethod.POST) {
+        throw new BadRequestException(HttpResponseStatus.METHOD_NOT_ALLOWED,
+                "Method not allowed", "The HTTP method [" + query.method().getName() +
+                "] is not permitted for this endpoint");
+      }
+
+      final String[] uri = query.explodeAPIPath();
+      final String endpoint = uri.length > 1 ? uri[1] : "";
+
+      if (endpoint.toLowerCase().equals("last")) {
+        handleLastDataPointQuery(tsdb, query);
+        return;
+      } else {
+        data_query = handleQuery(tsdb, query);
+      }
+    } finally {
+      long elapsed = queryExecutionTimer.stop();
+      LOG.info("Took " + (elapsed / (1000 * 1000)) + "ms to process query=" + data_query);
     }
-    
-    final String[] uri = query.explodeAPIPath();
-    final String endpoint = uri.length > 1 ? uri[1] : ""; 
-    
-    if (endpoint.toLowerCase().equals("last")) {
-      handleLastDataPointQuery(tsdb, query);
-      return;
-    } else {
-      handleQuery(tsdb, query);
-    }
+
   }
 
   /**
@@ -97,7 +106,7 @@ final class QueryRpc implements HttpRpc {
    * @param tsdb The TSDB to which we belong
    * @param query The HTTP query to parse/respond
    */
-  private void handleQuery(final TSDB tsdb, final HttpQuery query) {
+  private TSQuery handleQuery(final TSDB tsdb, final HttpQuery query) {
     final TSQuery data_query;
     if (query.method() == HttpMethod.POST) {
       switch (query.apiVersion()) {
@@ -112,6 +121,14 @@ final class QueryRpc implements HttpRpc {
       }
     } else {
       data_query = this.parseQuery(tsdb, query);
+    }
+
+    QueryStats.numQueries().inc();
+    if (data_query.getExpressionTrees() != null) {
+      QueryStats.numExpressions().inc(data_query.getExpressionTrees().size());
+    }
+    if (data_query.getQueries() != null) {
+      QueryStats.numMetrics().inc(data_query.getQueries().size());
     }
     
     // validate and then compile the queries
@@ -196,6 +213,8 @@ final class QueryRpc implements HttpRpc {
           "Requested API version not implemented", "Version " + 
           query.apiVersion() + " is not implemented");
     }
+
+    return data_query;
   }
   
   /**
@@ -422,6 +441,7 @@ final class QueryRpc implements HttpRpc {
     if (data_query.getQueries() == null || data_query.getQueries().size() < 1) {
       throw new BadRequestException("Missing sub queries");
     }
+
     return data_query;
   }
 

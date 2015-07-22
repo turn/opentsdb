@@ -15,10 +15,13 @@ package net.opentsdb.core;
 import java.util.Arrays;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.concurrent.TimeUnit;
 
 import com.google.common.annotations.VisibleForTesting;
 
 import net.opentsdb.core.Aggregators.Interpolation;
+import net.opentsdb.core.metrics.Timer;
+import net.opentsdb.tsd.QueryStats;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -326,6 +329,9 @@ public final class AggregationIterator implements SeekableView, DataPoint,
   private void endReached(final int i) {
     //LOG.debug("No more DP for #" + i);
     timestamps[iterators.length + i] = TIME_MASK;
+    if (iterators[i] instanceof Downsampler) {
+      downsampleTimeInNanos += ((Downsampler) iterators[i]).totalTime();
+    }
     iterators[i] = null;  // We won't use it anymore, so free() it.
   }
 
@@ -362,63 +368,78 @@ public final class AggregationIterator implements SeekableView, DataPoint,
         return true;
       }
     }
+
+    QueryStats.aggregationTimer().update(aggregationTimeInNanos, TimeUnit.NANOSECONDS);
+    QueryStats.interpolationTimer().update(interpolationTimeInNanos, TimeUnit.NANOSECONDS);
+    QueryStats.downSampleTimer().update(downsampleTimeInNanos, TimeUnit.NANOSECONDS);
+    QueryStats.moveToNext().update(moveToNextTimeInNanos, TimeUnit.NANOSECONDS);
+
+    LOG.debug("Total aggregationTime=" + (aggregationTimeInNanos / (1000 * 1000)) + "ms.");
+    LOG.debug("Total interpolationTime=" + (interpolationTimeInNanos / (1000 * 1000)) + "ms.");
+    LOG.debug("Total downSampleTime=" + (downsampleTimeInNanos / (1000 * 1000)) + "ms.");
+    LOG.debug("Total moveToNextTime=" + (moveToNextTimeInNanos / (1000 * 1000)) + "ms.");
     //LOG.debug("No hasNext (return false)");
     return false;
   }
 
   public DataPoint next() {
-    final int size = iterators.length;
-    long min_ts = Long.MAX_VALUE;
+    long moveToNextDuration = System.nanoTime();
+    try {
+      final int size = iterators.length;
+      long min_ts = Long.MAX_VALUE;
 
-    // In case we reached the end of one or more Spans, we need to make sure
-    // we mark them as such by zeroing their current timestamp.  There may
-    // be multiple Spans that reached their end at once, so check them all.
-    for (int i = current; i < size; i++) {
-      if (timestamps[i + size] == TIME_MASK) {
-        //LOG.debug("Expiring last DP for #" + current);
-        timestamps[i] = 0;
-      }
-    }
-
-    // Now we need to find which Span we'll consume next.  We'll pick the
-    // one that has the data point with the smallest timestamp since we want to
-    // return them in chronological order.
-    current = -1;
-    // If there's more than one Span with the same smallest timestamp, we'll
-    // set this to true so we can fetch the next data point in all of them at
-    // the same time.
-    boolean multiple = false;
-    for (int i = 0; i < size; i++) {
-      final long timestamp = timestamps[size + i] & TIME_MASK;
-      if (timestamp <= end_time) {
-        if (timestamp < min_ts) {
-          min_ts = timestamp;
-          current = i;
-          // We just found a new minimum so right now we can't possibly have
-          // multiple Spans with the same minimum.
-          multiple = false;
-        } else if (timestamp == min_ts) {
-          multiple = true;
+      // In case we reached the end of one or more Spans, we need to make sure
+      // we mark them as such by zeroing their current timestamp.  There may
+      // be multiple Spans that reached their end at once, so check them all.
+      for (int i = current; i < size; i++) {
+        if (timestamps[i + size] == TIME_MASK) {
+          //LOG.debug("Expiring last DP for #" + current);
+          timestamps[i] = 0;
         }
       }
-    }
-    if (current < 0) {
-      throw new NoSuchElementException("no more elements");
-    }
-    moveToNext(current);
-    if (multiple) {
-      //LOG.debug("Moving multiple DPs at time " + min_ts);
-      // We know we saw at least one other data point with the same minimum
-      // timestamp after `current', so let's move those ones too.
-      for (int i = current + 1; i < size; i++) {
+
+      // Now we need to find which Span we'll consume next.  We'll pick the
+      // one that has the data point with the smallest timestamp since we want to
+      // return them in chronological order.
+      current = -1;
+      // If there's more than one Span with the same smallest timestamp, we'll
+      // set this to true so we can fetch the next data point in all of them at
+      // the same time.
+      boolean multiple = false;
+      for (int i = 0; i < size; i++) {
         final long timestamp = timestamps[size + i] & TIME_MASK;
-        if (timestamp == min_ts) {
-          moveToNext(i);
+        if (timestamp <= end_time) {
+          if (timestamp < min_ts) {
+            min_ts = timestamp;
+            current = i;
+            // We just found a new minimum so right now we can't possibly have
+            // multiple Spans with the same minimum.
+            multiple = false;
+          } else if (timestamp == min_ts) {
+            multiple = true;
+          }
         }
       }
-    }
+      if (current < 0) {
+        throw new NoSuchElementException("no more elements");
+      }
+      moveToNext(current);
+      if (multiple) {
+        //LOG.debug("Moving multiple DPs at time " + min_ts);
+        // We know we saw at least one other data point with the same minimum
+        // timestamp after `current', so let's move those ones too.
+        for (int i = current + 1; i < size; i++) {
+          final long timestamp = timestamps[size + i] & TIME_MASK;
+          if (timestamp == min_ts) {
+            moveToNext(i);
+          }
+        }
+      }
 
-    return this;
+      return this;
+    } finally {
+      moveToNextTimeInNanos += System.nanoTime() - moveToNextDuration;
+    }
   }
 
   /**
@@ -479,26 +500,42 @@ public final class AggregationIterator implements SeekableView, DataPoint,
     return true;
   }
 
+  long aggregationTimeInNanos = 0;
+  long interpolationTimeInNanos= 0;
+  long downsampleTimeInNanos = 0;
+  long moveToNextTimeInNanos = 0;
+
   public long longValue() {
-    if (isInteger()) {
-      pos = -1;
-      return aggregator.runLong(this);
+    long aggregationTimeStart = System.nanoTime();
+    try {
+      if (isInteger()) {
+        pos = -1;
+        long l = aggregator.runLong(this);
+        aggregationTimeInNanos += (System.nanoTime() - aggregationTimeInNanos);
+        return l;
+      }
+      throw new ClassCastException("current value is a double: " + this);
+    } finally {
+      aggregationTimeInNanos += (System.nanoTime() - aggregationTimeStart);
     }
-    throw new ClassCastException("current value is a double: " + this);
   }
 
   public double doubleValue() {
-    if (!isInteger()) {
-      pos = -1;
-      final double value = aggregator.runDouble(this);
-      //LOG.debug("aggregator returned " + value);
-      if (value != value || Double.isInfinite(value)) {
-        throw new IllegalStateException("Got NaN or Infinity: "
-           + value + " in this " + this);
+    long aggregationTimeStart = System.nanoTime();
+    try {
+      if (!isInteger()) {
+        pos = -1;
+        final double value = aggregator.runDouble(this);
+        if (value != value || Double.isInfinite(value)) {
+          throw new IllegalStateException("Got NaN or Infinity: "
+                  + value + " in this " + this);
+        }
+        return value;
       }
-      return value;
+      throw new ClassCastException("current value is a long: " + this);
+    } finally {
+      aggregationTimeInNanos += (System.nanoTime() - aggregationTimeStart);
     }
-    throw new ClassCastException("current value is a long: " + this);
   }
 
   public double toDouble() {
@@ -535,49 +572,55 @@ public final class AggregationIterator implements SeekableView, DataPoint,
   }
 
   public long nextLongValue() {
-    if (hasNextValue(true)) {
-      final long y0 = values[pos];
-      if (rate) {
-        throw new AssertionError("Should not be here, impossible! " + this);
+    long interpolationStartTime = System.nanoTime();
+
+    try {
+      if (hasNextValue(true)) {
+        final long y0 = values[pos];
+        if (rate) {
+          throw new AssertionError("Should not be here, impossible! " + this);
+        }
+        if (current == pos) {
+          return y0;
+        }
+        final long x = timestamps[current] & TIME_MASK;
+        final long x0 = timestamps[pos] & TIME_MASK;
+        if (x == x0) {
+          return y0;
+        }
+        final long y1 = values[pos + iterators.length];
+        final long x1 = timestamps[pos + iterators.length] & TIME_MASK;
+        if (x == x1) {
+          return y1;
+        }
+        if ((x1 & Const.MILLISECOND_MASK) != 0) {
+          throw new AssertionError("x1=" + x1 + " in " + this);
+        }
+        final long r;
+        switch (method) {
+          case LERP:
+            r = y0 + (x - x0) * (y1 - y0) / (x1 - x0);
+            //LOG.debug("Lerping to time " + x + ": " + y0 + " @ " + x0
+            //          + " -> " + y1 + " @ " + x1 + " => " + r);
+            break;
+          case ZIM:
+            r = 0;
+            break;
+          case MAX:
+            r = Long.MAX_VALUE;
+            break;
+          case MIN:
+            r = Long.MIN_VALUE;
+            break;
+          default:
+            throw new IllegalDataException("Invalid interploation somehow??");
+        }
+        return r;
       }
-      if (current == pos) {
-        return y0;
-      }
-      final long x = timestamps[current] & TIME_MASK;
-      final long x0 = timestamps[pos] & TIME_MASK;
-      if (x == x0) {
-        return y0;
-      }
-      final long y1 = values[pos + iterators.length];
-      final long x1 = timestamps[pos + iterators.length] & TIME_MASK;
-      if (x == x1) {
-        return y1;
-      }
-      if ((x1 & Const.MILLISECOND_MASK) != 0) {
-        throw new AssertionError("x1=" + x1 + " in " + this);
-      }
-      final long r;
-      switch (method) {
-        case LERP:
-          r = y0 + (x - x0) * (y1 - y0) / (x1 - x0);
-          //LOG.debug("Lerping to time " + x + ": " + y0 + " @ " + x0
-          //          + " -> " + y1 + " @ " + x1 + " => " + r);
-          break;
-        case ZIM:
-          r = 0;
-          break;
-        case MAX:
-          r = Long.MAX_VALUE;
-          break;
-        case MIN:
-          r = Long.MIN_VALUE;
-          break;
-        default:
-          throw new IllegalDataException("Invalid interploation somehow??");
-      }
-      return r;
+      throw new NoSuchElementException("no more longs in " + this);
+    } finally {
+      interpolationTimeInNanos += (System.nanoTime() - interpolationStartTime);
     }
-    throw new NoSuchElementException("no more longs in " + this);
   }
 
   // ---------------------------- //
@@ -585,48 +628,51 @@ public final class AggregationIterator implements SeekableView, DataPoint,
   // ---------------------------- //
 
   public double nextDoubleValue() {
-    if (hasNextValue(true)) {
-      final double y0 = ((timestamps[pos] & FLAG_FLOAT) == FLAG_FLOAT
-                         ? Double.longBitsToDouble(values[pos])
-                         : values[pos]);
-      if (current == pos) {
-        //LOG.debug("Exact match, no lerp needed");
-        return y0;
-      }
-      if (rate) {
-        // No LERP for the rate. Just uses the rate of any previous timestamp.
-        // If x0 is smaller than the current time stamp 'x', we just use
-        // y0 as a current rate of the 'pos' span. If x0 is bigger than the
-        // current timestamp 'x', we don't go back further and just use y0
-        // instead. It happens only at the beginning of iteration.
-        // TODO: Use the next rate the time range of which includes the current
-        // timestamp 'x'.
-        return y0;
-      }
-      final long x = timestamps[current] & TIME_MASK;
-      final long x0 = timestamps[pos] & TIME_MASK;
-      if (x == x0) {
-        //LOG.debug("No lerp needed x == x0 (" + x + " == "+x0+") => " + y0);
-        return y0;
-      }
-      final int next = pos + iterators.length;
-      final double y1 = ((timestamps[next] & FLAG_FLOAT) == FLAG_FLOAT
-                         ? Double.longBitsToDouble(values[next])
-                         : values[next]);
-      final long x1 = timestamps[next] & TIME_MASK;
-      if (x == x1) {
-        //LOG.debug("No lerp needed x == x1 (" + x + " == "+x1+") => " + y1);
-        return y1;
-      }
-      if ((x1 & Const.MILLISECOND_MASK) != 0) {
-        throw new AssertionError("x1=" + x1 + " in " + this);
-      }
-      final double r;
-      switch (method) {
-      case LERP:
-        r = y0 + (x - x0) * (y1 - y0) / (x1 - x0);
-        //LOG.debug("Lerping to time " + x + ": " + y0 + " @ " + x0
-        //          + " -> " + y1 + " @ " + x1 + " => " + r);
+    long interpolationStartTime = System.nanoTime();
+
+    try {
+      if (hasNextValue(true)) {
+        final double y0 = ((timestamps[pos] & FLAG_FLOAT) == FLAG_FLOAT
+                ? Double.longBitsToDouble(values[pos])
+                : values[pos]);
+        if (current == pos) {
+          //LOG.debug("Exact match, no lerp needed");
+          return y0;
+        }
+        if (rate) {
+          // No LERP for the rate. Just uses the rate of any previous timestamp.
+          // If x0 is smaller than the current time stamp 'x', we just use
+          // y0 as a current rate of the 'pos' span. If x0 is bigger than the
+          // current timestamp 'x', we don't go back further and just use y0
+          // instead. It happens only at the beginning of iteration.
+          // TODO: Use the next rate the time range of which includes the current
+          // timestamp 'x'.
+          return y0;
+        }
+        final long x = timestamps[current] & TIME_MASK;
+        final long x0 = timestamps[pos] & TIME_MASK;
+        if (x == x0) {
+          //LOG.debug("No lerp needed x == x0 (" + x + " == "+x0+") => " + y0);
+          return y0;
+        }
+        final int next = pos + iterators.length;
+        final double y1 = ((timestamps[next] & FLAG_FLOAT) == FLAG_FLOAT
+                ? Double.longBitsToDouble(values[next])
+                : values[next]);
+        final long x1 = timestamps[next] & TIME_MASK;
+        if (x == x1) {
+          //LOG.debug("No lerp needed x == x1 (" + x + " == "+x1+") => " + y1);
+          return y1;
+        }
+        if ((x1 & Const.MILLISECOND_MASK) != 0) {
+          throw new AssertionError("x1=" + x1 + " in " + this);
+        }
+        final double r;
+        switch (method) {
+          case LERP:
+            r = y0 + (x - x0) * (y1 - y0) / (x1 - x0);
+            //LOG.debug("Lerping to time " + x + ": " + y0 + " @ " + x0
+            //          + " -> " + y1 + " @ " + x1 + " => " + r);
 //        LOG.info("LERP x1="+ x1
 //                + ", x1=" + x1
 //                + ", x=" + x
@@ -634,22 +680,26 @@ public final class AggregationIterator implements SeekableView, DataPoint,
 //                + ", y1=" + y1
 //                + ", y0=" + y0
 //                + ", r=" + r);
-        break;
-      case ZIM:
-        r = 0;
-        break;
-      case MAX:
-        r = Double.MAX_VALUE;
-        break;
-      case MIN:
-        r = Double.MIN_VALUE;
-        break;
-      default:
-        throw new IllegalDataException("Invalid interploation somehow??");
+            break;
+          case ZIM:
+            r = 0;
+            break;
+          case MAX:
+            r = Double.MAX_VALUE;
+            break;
+          case MIN:
+            r = Double.MIN_VALUE;
+            break;
+          default:
+            throw new IllegalDataException("Invalid interploation somehow??");
+        }
+        return r;
+      }
+
+      throw new NoSuchElementException("no more doubles in " + this);
+    } finally {
+      interpolationTimeInNanos += (System.nanoTime() - interpolationStartTime);
     }
-      return r;
-    }
-    throw new NoSuchElementException("no more doubles in " + this);
   }
 
   public String toString() {

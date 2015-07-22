@@ -77,7 +77,7 @@ private int jjMoveStringLiteralDfa1_0(long active0)
 private int jjMoveNfa_0(int startState, int curPos)
 {
    int startsAt = 0;
-   jjnewStateCnt = 1;
+   jjnewStateCnt = 2;
    int i = 1;
    jjstateSet[0] = startState;
    int kind = 0x7fffffff;
@@ -93,10 +93,23 @@ private int jjMoveNfa_0(int startState, int curPos)
             switch(jjstateSet[--i])
             {
                case 0:
-                  if ((0x3ffe08800000000L & l) == 0L)
+                  if ((0x3ffe09800000000L & l) != 0L)
+                  {
+                     if (kind > 5)
+                        kind = 5;
+                     jjCheckNAdd(1);
+                  }
+                  else if (curChar == 42)
+                  {
+                     if (kind > 5)
+                        kind = 5;
+                  }
+                  break;
+               case 1:
+                  if ((0x3ffe09800000000L & l) == 0L)
                      break;
                   kind = 5;
-                  jjstateSet[jjnewStateCnt++] = 0;
+                  jjCheckNAdd(1);
                   break;
                default : break;
             }
@@ -110,10 +123,11 @@ private int jjMoveNfa_0(int startState, int curPos)
             switch(jjstateSet[--i])
             {
                case 0:
+               case 1:
                   if ((0x17fffffeafffffffL & l) == 0L)
                      break;
                   kind = 5;
-                  jjstateSet[jjnewStateCnt++] = 0;
+                  jjCheckNAdd(1);
                   break;
                default : break;
             }
@@ -138,7 +152,7 @@ private int jjMoveNfa_0(int startState, int curPos)
          kind = 0x7fffffff;
       }
       ++curPos;
-      if ((i = jjnewStateCnt) == (startsAt = 1 - (jjnewStateCnt = startsAt)))
+      if ((i = jjnewStateCnt) == (startsAt = 2 - (jjnewStateCnt = startsAt)))
          return curPos;
       try { curChar = input_stream.readChar(); }
       catch(java.io.IOException e) { return curPos; }
@@ -163,8 +177,8 @@ static final long[] jjtoSkip = {
    0x1eL, 
 };
 protected SimpleCharStream input_stream;
-private final int[] jjrounds = new int[1];
-private final int[] jjstateSet = new int[2];
+private final int[] jjrounds = new int[2];
+private final int[] jjstateSet = new int[4];
 protected char curChar;
 /** Constructor. */
 public SyntaxCheckerTokenManager(SimpleCharStream stream){
@@ -191,7 +205,7 @@ private void ReInitRounds()
 {
    int i;
    jjround = 0x80000001;
-   for (i = 1; i-- > 0;)
+   for (i = 2; i-- > 0;)
       jjrounds[i] = 0x80000000;
 }
 
