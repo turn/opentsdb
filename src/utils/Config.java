@@ -482,6 +482,7 @@ public class Config {
     default_map.put("tsd.queryprocessing.parallel_scan.enable", "false");
     default_map.put("tsd.queryprocessing.parallel_scan.threshold",
             String.valueOf(TimeUnit.SECONDS.convert(365, TimeUnit.DAYS)));
+    default_map.put("tsd.queryprocessing.parallel_scan.bucket_size", "3600");
     default_map.put("tsd.storage.fix_duplicates", "false");
     default_map.put("tsd.storage.flush_interval", "1000");
     default_map.put("tsd.storage.hbase.data_table", "tsdb");
@@ -646,7 +647,7 @@ public class Config {
     return parallel_scan_threshold_in_seconds;
   }
 
-  public long parallel_size_bucket_size() {
+  public long parallel_scan_bucket_size() {
     return parallel_scan_bucket_size;
   }
 }

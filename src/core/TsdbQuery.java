@@ -334,6 +334,30 @@ final class TsdbQuery implements Query {
   
   @Override
   public Deferred<DataPoints[]> runAsync() throws HBaseException {
+    long startTime = getStartTime();
+    // down cast to seconds if we have a query in ms
+    if ((startTime & Const.SECOND_MASK) != 0) {
+      startTime /= 1000;
+    }
+
+    long endTime = getEndTime();
+    if ( (endTime & Const.SECOND_MASK) != 0 ) {
+      endTime /= 1000;
+    }
+
+    LOG.info("startTime={}, endTime={}", startTime, endTime);
+
+    final long _d = tsdb.getConfig().parallel_scan_bucket_size();
+
+    long delta = startTime % _d;
+    LOG.info("First interval is {} to {}", startTime, startTime - delta + _d);
+    delta = startTime - delta + _d;
+    while (delta + _d < endTime) {
+      LOG.info("Add interval from {} to {}", delta, delta + _d);
+      delta = delta + _d;
+    }
+    LOG.info("Last interval is {} to {}", delta, endTime);
+
     long findSpansStartTime = System.nanoTime();
     return findSpans().addCallback(new GroupByAndAggregateCB(findSpansStartTime));
   }
