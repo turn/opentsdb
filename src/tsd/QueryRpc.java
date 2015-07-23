@@ -146,7 +146,13 @@ final class QueryRpc implements HttpRpc {
       new ArrayList<DataPoints[]>(nqueries);
     final ArrayList<Deferred<DataPoints[]>> deferreds =
       new ArrayList<Deferred<DataPoints[]>>(nqueries);
-    
+
+    for (Query tq: tsdbqueries) {
+      if (longRangeQuery(tsdb, tq)) {
+        LOG.info("", tq.getStartTime(), tq.getStartTime());tq.getEndTime();
+      }
+    }
+
     for (int i = 0; i < nqueries; i++) {
       deferreds.add(tsdbqueries[i].runAsync());
     }
@@ -168,14 +174,19 @@ final class QueryRpc implements HttpRpc {
     // forward as we can't just add it to the "deferreds" queue since the types
     // are different.
     List<Annotation> globals = null;
-    if (!data_query.getNoAnnotations() && data_query.getGlobalAnnotations()) {
-      try {
-        globals = Annotation.getGlobalAnnotations(tsdb, 
-            data_query.startTime() / 1000, data_query.endTime() / 1000)
-            .joinUninterruptibly();
-      } catch (Exception e) {
-        throw new RuntimeException("Shouldn't be here", e);
+    Timer.Context annTimer = QueryStats.annotationTimer().time();
+    try {
+      if (!data_query.getNoAnnotations() && data_query.getGlobalAnnotations()) {
+        try {
+          globals = Annotation.getGlobalAnnotations(tsdb,
+                  data_query.startTime() / 1000, data_query.endTime() / 1000)
+                  .joinUninterruptibly();
+        } catch (Exception e) {
+          throw new RuntimeException("Shouldn't be here", e);
+        }
       }
+    } finally {
+      annTimer.stop();
     }
 
     try {
@@ -185,18 +196,23 @@ final class QueryRpc implements HttpRpc {
       throw new RuntimeException("Shouldn't be here", e);
     }
 
+    Timer.Context expTimer = QueryStats.expressionTimer().time();
     List<ExpressionTree> exprs = data_query.getExpressionTrees();
     List<DataPoints[]> exprResults = Lists.newArrayList();
-    if (exprs != null && exprs.size() > 0) {
-      for (ExpressionTree tree: exprs) {
-        try {
-          exprResults.add(tree.evaluate(results));
-        } catch (Exception e) {
+    try {
+      if (exprs != null && exprs.size() > 0) {
+        for (ExpressionTree tree : exprs) {
+          try {
+            exprResults.add(tree.evaluate(results));
+          } catch (Exception e) {
             LOG.error("Error evaluating expression", e);
+          }
         }
       }
+    } finally {
+      expTimer.stop();
     }
-    
+
     switch (query.apiVersion()) {
     case 0:
     case 1:
@@ -216,7 +232,16 @@ final class QueryRpc implements HttpRpc {
 
     return data_query;
   }
-  
+
+  private boolean longRangeQuery(TSDB tsdb, Query tq) {
+    if (!tsdb.getConfig().parallel_scan_enable()) {
+      return false;
+    }
+
+    long interval = tq.getEndTime() - tq.getStartTime();
+    return interval > tsdb.getConfig().parallel_scan_threshold_in_seconds();
+  }
+
   /**
    * 
    * @param tsdb The TSDB to which we belong

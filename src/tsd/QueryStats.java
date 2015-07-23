@@ -96,6 +96,14 @@ public class QueryStats {
 		return QUERY_METRICS_REGISTRY.histogram("compactionColumns");
 	}
 
+	public static Timer expressionTimer() {
+		return QUERY_METRICS_REGISTRY.timer("expressionTimer");
+	}
+
+	public static Timer annotationTimer() {
+		return QUERY_METRICS_REGISTRY.timer("annotationTimer");
+	}
+
 	public static void collectStats(StatsCollector collector) {
 
 		collector.record("query.queries.count", numQueries().getCount());
@@ -205,6 +213,13 @@ public class QueryStats {
 		collector.record("query.queryExecution.95thpercentile", queryExecutionTimer().getSnapshot().get98thPercentile());
 		collector.record("query.queryExecution.98thpercentile", queryExecutionTimer().getSnapshot().get98thPercentile());
 		collector.record("query.queryExecution.99thpercentile", queryExecutionTimer().getSnapshot().get99thPercentile());
-	}
 
+		collector.record("query.expressionTimer.max", expressionTimer().getSnapshot().getMax());
+		collector.record("query.expressionTimer.min", expressionTimer().getSnapshot().getMin());
+		collector.record("query.expressionTimer.mean", expressionTimer().getSnapshot().get75thPercentile());
+		collector.record("query.expressionTimer.75thpercentile", expressionTimer().getSnapshot().get75thPercentile());
+		collector.record("query.expressionTimer.95thpercentile", expressionTimer().getSnapshot().get98thPercentile());
+		collector.record("query.expressionTimer.98thpercentile", expressionTimer().getSnapshot().get98thPercentile());
+		collector.record("query.expressionTimer.99thpercentile", expressionTimer().getSnapshot().get99thPercentile());
+	}
 }
