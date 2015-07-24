@@ -21,6 +21,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import net.opentsdb.core.metrics.Timer;
@@ -127,6 +129,30 @@ final class TsdbQuery implements Query {
   /** Constructor. */
   public TsdbQuery(final TSDB tsdb) {
     this.tsdb = tsdb;
+  }
+
+  static TsdbQuery copyOf(TsdbQuery original) {
+    TsdbQuery n = new TsdbQuery(original.tsdb);
+    if (original.tags != null) n.tags = new ArrayList<byte[]>(original.tags);
+    if (original.group_bys != null) n.group_bys = new ArrayList<byte[]>(original.group_bys);
+    if (original.group_by_values != null) n.group_by_values = original.group_by_values;
+    if (original.rate_options != null) n.rate_options = original.rate_options;
+    if (original.aggregator != null) n.aggregator = original.aggregator;
+    if (original.downsampler != null) n.downsampler = original.downsampler;
+    if (original.tsuids != null) n.tsuids = original.tsuids;
+    n.sample_interval_ms = original.sample_interval_ms;
+    n.start_time = original.start_time;
+    n.end_time = original.end_time;
+    n.metric = Arrays.copyOf(original.metric, original.metric.length);
+    n.rate = original.rate;
+    return n;
+  }
+
+  static TsdbQuery spliceOf(TsdbQuery original, long splice_start_time, long splice_end_time) {
+    TsdbQuery nq = copyOf(original);
+    nq.start_time = splice_start_time;
+    nq.end_time = splice_end_time;
+    return nq;
   }
 
   /**
@@ -331,6 +357,8 @@ final class TsdbQuery implements Query {
       throw new RuntimeException("Should never be here", e);
     }
   }
+
+  static ExecutorService SPLICED_QUERY_EXECUTION_SERVICE = Executors.newCachedThreadPool();
   
   @Override
   public Deferred<DataPoints[]> runAsync() throws HBaseException {
@@ -349,15 +377,44 @@ final class TsdbQuery implements Query {
 
     final long _d = tsdb.getConfig().parallel_scan_bucket_size();
 
+    List<TsdbQuery> splicedQueries = new ArrayList<TsdbQuery>();
     long delta = startTime % _d;
-    LOG.info("First interval is {} to {}", startTime, startTime - delta + _d);
-    delta = startTime - delta + _d;
-    while (delta + _d < endTime) {
-      LOG.info("Add interval from {} to {}", delta, delta + _d);
-      delta = delta + _d;
+    long end = startTime - delta + _d;
+    int ix = 0;
+    LOG.info("First interval is {} to {}", startTime, end);
+    splicedQueries.add(TsdbQuery.spliceOf(this, startTime, end));
+    while (end + _d < endTime) {
+      LOG.info("Add interval# {} from {} to {}", ++ix, end, end + _d);
+      TsdbQuery splice = TsdbQuery.spliceOf(this, end, end + _d);
+      splicedQueries.add(splice);
+      end = end + _d;
     }
-    LOG.info("Last interval is {} to {}", delta, endTime);
+    LOG.info("Last interval is {} to {}", end, endTime);
+    splicedQueries.add(TsdbQuery.spliceOf(this, end, endTime));
 
+    if (splicedQueries.size() > 2) {
+      for (final TsdbQuery splice: splicedQueries) {
+        Runnable r = new Runnable() {
+          @Override
+          public void run() {
+            LOG.info("Running from interval {} to {}", splice.start_time, splice.end_time);
+            long start = System.currentTimeMillis();
+            splice.runWithoutSplice();
+            LOG.info("Took {} ms.", (System.currentTimeMillis() - start));
+          }
+        };
+        SPLICED_QUERY_EXECUTION_SERVICE.submit(r);
+      }
+
+      return Deferred.fromResult(new DataPoints[]{});
+    }
+
+    // serial execution: 219.127425909 (3h)
+    long findSpansStartTime = System.nanoTime();
+    return findSpans().addCallback(new GroupByAndAggregateCB(findSpansStartTime));
+  }
+
+  private Deferred<DataPoints[]> runWithoutSplice() {
     long findSpansStartTime = System.nanoTime();
     return findSpans().addCallback(new GroupByAndAggregateCB(findSpansStartTime));
   }

@@ -251,6 +251,7 @@ public final class RpcManager {
         final ImmutableMap.Builder<String, TelnetRpc> telnet,
         final ImmutableMap.Builder<String, HttpRpc> http) {
     if (mode.equals("rw") || mode.equals("wo")) {
+      if (true) throw new RuntimeException("Can't start this");
       final PutDataPointRpc put = new PutDataPointRpc();
       telnet.put("put", put);
       http.put("api/put", put);
