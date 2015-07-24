@@ -147,12 +147,6 @@ final class QueryRpc implements HttpRpc {
     final ArrayList<Deferred<DataPoints[]>> deferreds =
       new ArrayList<Deferred<DataPoints[]>>(nqueries);
 
-    for (Query tq: tsdbqueries) {
-      if (longRangeQuery(tsdb, tq)) {
-        LOG.info("", tq.getStartTime(), tq.getStartTime());tq.getEndTime();
-      }
-    }
-
     for (int i = 0; i < nqueries; i++) {
       deferreds.add(tsdbqueries[i].runAsync());
     }

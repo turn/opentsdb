@@ -12,6 +12,8 @@
 // see <http://www.gnu.org/licenses/>.
 package net.opentsdb.core;
 
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -362,56 +364,67 @@ final class TsdbQuery implements Query {
   
   @Override
   public Deferred<DataPoints[]> runAsync() throws HBaseException {
-    long startTime = getStartTime();
-    // down cast to seconds if we have a query in ms
-    if ((startTime & Const.SECOND_MASK) != 0) {
-      startTime /= 1000;
-    }
-
-    long endTime = getEndTime();
-    if ( (endTime & Const.SECOND_MASK) != 0 ) {
-      endTime /= 1000;
-    }
-
-    LOG.info("startTime={}, endTime={}", startTime, endTime);
-
-    final long _d = tsdb.getConfig().parallel_scan_bucket_size();
-
-    List<TsdbQuery> splicedQueries = new ArrayList<TsdbQuery>();
-    long delta = startTime % _d;
-    long end = startTime - delta + _d;
-    int ix = 0;
-    LOG.info("First interval is {} to {}", startTime, end);
-    splicedQueries.add(TsdbQuery.spliceOf(this, startTime, end));
-    while (end + _d < endTime) {
-      LOG.info("Add interval# {} from {} to {}", ++ix, end, end + _d);
-      TsdbQuery splice = TsdbQuery.spliceOf(this, end, end + _d);
-      splicedQueries.add(splice);
-      end = end + _d;
-    }
-    LOG.info("Last interval is {} to {}", end, endTime);
-    splicedQueries.add(TsdbQuery.spliceOf(this, end, endTime));
-
-    if (splicedQueries.size() > 2) {
-      for (final TsdbQuery splice: splicedQueries) {
-        Runnable r = new Runnable() {
-          @Override
-          public void run() {
-            LOG.info("Running from interval {} to {}", splice.start_time, splice.end_time);
-            long start = System.currentTimeMillis();
-            splice.runWithoutSplice();
-            LOG.info("Took {} ms.", (System.currentTimeMillis() - start));
-          }
-        };
-        SPLICED_QUERY_EXECUTION_SERVICE.submit(r);
+    boolean trySplice = true;
+    if (trySplice) {
+      long startTime = getStartTime();
+      // down cast to seconds if we have a query in ms
+      if ((startTime & Const.SECOND_MASK) != 0) {
+        startTime /= 1000;
       }
 
-      return Deferred.fromResult(new DataPoints[]{});
+      long endTime = getEndTime();
+      if ((endTime & Const.SECOND_MASK) != 0) {
+        endTime /= 1000;
+      }
+
+      LOG.info("startTime={}, endTime={}", startTime, endTime);
+
+      final long _d = tsdb.getConfig().parallel_scan_bucket_size();
+
+      List<TsdbQuery> splicedQueries = new ArrayList<TsdbQuery>();
+      long delta = startTime % _d;
+      long end = startTime - delta + _d;
+      int ix = 0;
+      LOG.info("First interval is {} to {}", startTime, end);
+      splicedQueries.add(TsdbQuery.spliceOf(this, startTime, end));
+      while (end + _d < endTime) {
+        LOG.info("Add interval# {} from {} to {}", ++ix, end, end + _d);
+        TsdbQuery splice = TsdbQuery.spliceOf(this, end, end + _d);
+        splicedQueries.add(splice);
+        end = end + _d;
+      }
+      LOG.info("Last interval is {} to {}", end, endTime);
+      splicedQueries.add(TsdbQuery.spliceOf(this, end, endTime));
+
+      if (splicedQueries.size() > 2) {
+        for (final TsdbQuery splice : splicedQueries) {
+          Runnable r = new Runnable() {
+            @Override
+            public void run() {
+              LOG.info("Running from interval {} to {}", splice.start_time, splice.end_time);
+              long start = System.currentTimeMillis();
+              try {
+                splice.runWithoutSplice().joinUninterruptibly();
+              } catch (Exception e) {
+                LOG.error("Fucked up", e);
+              }
+              LOG.info("Took {} ms.", (System.currentTimeMillis() - start));
+            }
+          };
+          SPLICED_QUERY_EXECUTION_SERVICE.submit(r);
+        }
+
+        return Deferred.fromResult(new DataPoints[]{});
+      } else {
+        long findSpansStartTime = System.nanoTime();
+        return findSpans().addCallback(new GroupByAndAggregateCB(findSpansStartTime));
+      }
+    } else {
+      // serial execution: 219.127425909 (3h)
+      long findSpansStartTime = System.nanoTime();
+      return findSpans().addCallback(new GroupByAndAggregateCB(findSpansStartTime));
     }
 
-    // serial execution: 219.127425909 (3h)
-    long findSpansStartTime = System.nanoTime();
-    return findSpans().addCallback(new GroupByAndAggregateCB(findSpansStartTime));
   }
 
   private Deferred<DataPoints[]> runWithoutSplice() {
@@ -437,7 +450,15 @@ final class TsdbQuery implements Query {
     final Scanner scanner = getScanner();
     final Deferred<TreeMap<byte[], Span>> results =
       new Deferred<TreeMap<byte[], Span>>();
-    
+
+    final FileOutputStream fos;
+    try {
+       fos = new FileOutputStream("/home/asatish/tsdb/"
+               + Thread.currentThread().getName().replaceAll("/", "-") + "-" + System.currentTimeMillis());
+    } catch (FileNotFoundException e) {
+      throw new RuntimeException(e);
+    }
+
     /**
     * Scanner callback executed recursively each time we get a set of data
     * from storage. This is responsible for determining what columns are
@@ -495,6 +516,7 @@ final class TsdbQuery implements Query {
              } else {
                results.callback(spans);
              }
+             fos.close();
              scanner.close();
              return null;
            }
@@ -506,6 +528,7 @@ final class TsdbQuery implements Query {
            int totalSize = 0;
            for (final ArrayList<KeyValue> row : rows) {
              final byte[] key = row.get(0).key();
+             fos.write(Arrays.toString(key).getBytes());fos.write("\n".getBytes());
              if (Bytes.memcmp(metric, key, 0, metric_width) != 0) {
                scanner.close();
                throw new IllegalDataException(
@@ -695,6 +718,11 @@ final class TsdbQuery implements Query {
 
     final Scanner scanner = tsdb.client.newScanner(tsdb.table);
     scanner.setMaxNumRows(tsdb.config.getHbaseClient_maxNumRows());
+    LOG.info("Start Row={}, End Row={}, Scan Start Time={}, Scan End Time={}",
+            Arrays.toString(start_row),
+            Arrays.toString(end_row),
+            getScanStartTimeSeconds(),
+            getScanEndTimeSeconds());
     scanner.setStartKey(start_row);
     scanner.setStopKey(end_row);
     if (tsuids != null && !tsuids.isEmpty()) {
@@ -725,6 +753,9 @@ final class TsdbQuery implements Query {
     if ((start & Const.SECOND_MASK) != 0) {
       start /= 1000;
     }
+
+    if (start > 0 && start % 3600 == 0) return start;
+
     final long ts = start - Const.MAX_TIMESPAN * 2 - sample_interval_ms / 1000;
     return ts > 0 ? ts : 0;
   }
@@ -743,6 +774,7 @@ final class TsdbQuery implements Query {
     if ((end & Const.SECOND_MASK) != 0) {
       end /= 1000;
     }
+    if (end > 0 && end % 3600 == 0) return end;
     return end + Const.MAX_TIMESPAN + 1 + sample_interval_ms / 1000;
   }
 
