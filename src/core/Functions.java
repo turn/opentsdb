@@ -687,4 +687,47 @@ public class Functions {
     }
   }
 
+  public static class AbsoluteFunction implements Expression {
+
+    @Override
+    public DataPoints[] evaluate(TSQuery data_query, List<DataPoints[]> queryResults, List<String> params) {
+      if (queryResults == null || queryResults.isEmpty()) {
+        throw new NullPointerException("Query results cannot be empty");
+      }
+
+      DataPoints[] inputPoints = queryResults.get(0);
+      DataPoints[] outputPoints = new DataPoints[inputPoints.length];
+
+      for (int i=0; i<inputPoints.length; i++) {
+        outputPoints[i] = abs(inputPoints[i]);
+      }
+
+      return outputPoints;
+    }
+
+    protected DataPoints abs(DataPoints points) {
+      int size = points.size();
+      DataPoint[] dps = new DataPoint[size];
+
+      SeekableView view = points.iterator();
+      int i=0;
+      while (view.hasNext()) {
+        DataPoint pt = view.next();
+        if (pt.isInteger()) {
+          dps[i] = MutableDataPoint.ofDoubleValue(pt.timestamp(), Math.abs(pt.longValue()));
+        } else {
+          dps[i] = MutableDataPoint.ofDoubleValue(pt.timestamp(), Math.abs(pt.doubleValue()));
+        }
+        i++;
+      }
+
+      return new PostAggregatedDataPoints(points, dps);
+    }
+
+    @Override
+    public String writeStringField(List<String> queryParams, String innerExpression) {
+      return "absolute(" + innerExpression + ")";
+    }
+  }
+
 }

@@ -26,6 +26,7 @@ public class ExpressionFactory {
     availableFunctions.put("id", new IdentityExpression());
     availableFunctions.put("alias", new AliasFunction());
     availableFunctions.put("scale", new Functions.ScaleFunction());
+    availableFunctions.put("absolute", new Functions.AbsoluteFunction());
     availableFunctions.put("sumSeries", new Functions.SumSeriesFunction());
     availableFunctions.put("sum", new Functions.SumSeriesFunction());
     availableFunctions.put("difference", new Functions.DifferenceSeriesFunction());
