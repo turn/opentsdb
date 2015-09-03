@@ -7,6 +7,7 @@ package net.opentsdb.core;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 
 import com.google.common.collect.Maps;
 import com.stumbleupon.async.Deferred;
@@ -124,7 +125,11 @@ public class PostAggregatedDataPoints implements DataPoints {
 
     @Override
     public DataPoint next() {
-      return dps[pos++];
+      if (hasNext()) {
+        return dps[pos++];
+      } else {
+        throw new NoSuchElementException("tsdb uses exceptions to determine end of iterators");
+      }
     }
 
     @Override
