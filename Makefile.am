@@ -186,7 +186,8 @@ tsdb_SRC := \
 	src/tsd/expression/parser/SyntaxCheckerTokenManager.java \
 	src/tsd/expression/parser/Token.java \
 	src/tsd/expression/parser/TokenMgrError.java \
-	src/tsd/QueryStats.java
+	src/tsd/QueryStats.java \
+	src/core/EndpointAligningAggregationIterator.java
 
 tsdb_DEPS = \
 	$(ASYNCHBASE)	\
