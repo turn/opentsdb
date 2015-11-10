@@ -417,7 +417,7 @@ public class Functions {
         views[i] = seekablePoints[i].iterator();
       }
 
-      SeekableView view = (new AggregationIterator(views,
+      SeekableView view = (new EndpointAligningAggregationIterator(views,
               data_query.startTime(), data_query.endTime(),
               Aggregators.MULTIPLY, Aggregators.Interpolation.LERP, false));
 
@@ -551,7 +551,7 @@ public class Functions {
         views[i] = seekablePoints[i].iterator();
       }
 
-      SeekableView view = (new AggregationIterator(views,
+      SeekableView view = (new EndpointAligningAggregationIterator(views,
               data_query.startTime(), data_query.endTime(),
               Aggregators.SUM, Aggregators.Interpolation.LERP, false));
 
