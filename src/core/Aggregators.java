@@ -15,6 +15,8 @@ package net.opentsdb.core;
 import java.util.HashMap;
 import java.util.NoSuchElementException;
 import java.util.Set;
+import java.util.Iterator;
+import java.util.LinkedList;
 
 import org.apache.commons.math3.stat.descriptive.rank.Percentile;
 import org.apache.commons.math3.stat.descriptive.rank.Percentile.EstimationType;
@@ -517,6 +519,304 @@ public final class Aggregators {
       }
     }
 
+  }
+  public static final class MovingAverage extends Aggregator {
+    private LinkedList<SumPoint> list = new LinkedList<SumPoint>();
+    private final long numPoints;
+    private final boolean isTimeUnit;
+
+    public MovingAverage(final Interpolation method, final String name, long numPoints, boolean isTimeUnit) {
+      super(method, name);
+      this.numPoints = numPoints;
+      this.isTimeUnit = isTimeUnit;
+    }
+
+    public long runLong(final Longs values) {
+      long sum = values.nextLongValue();
+      while (values.hasNextValue()) {
+        sum += values.nextLongValue();
+      }
+
+      if (values instanceof DataPoint) {
+        long ts = ((DataPoint) values).timestamp();
+        list.addFirst(new SumPoint(ts, sum));
+      }
+
+      long result = 0;
+      int count = 0;
+
+      Iterator<SumPoint> iter = list.iterator();
+      SumPoint first = iter.next();
+      boolean conditionMet = false;
+
+      // now sum up the preceeding points
+      while (iter.hasNext()) {
+        SumPoint next = iter.next();
+        result += (Long) next.val;
+        count++;
+        if (!isTimeUnit && count >= numPoints) {
+          conditionMet = true;
+          break;
+        } else if (isTimeUnit && ((first.ts - next.ts) > numPoints)) {
+          conditionMet = true;
+          break;
+        }
+      }
+
+      if (!conditionMet || count == 0) {
+        return 0;
+      }
+
+      return result / count;
+    }
+
+    @Override
+    public double runDouble(Doubles values) {
+      double sum = values.nextDoubleValue();
+      while (values.hasNextValue()) {
+        sum += values.nextDoubleValue();
+      }
+
+      if (values instanceof DataPoint) {
+        long ts = ((DataPoint) values).timestamp();
+        list.addFirst(new SumPoint(ts, sum));
+      }
+
+      double result = 0;
+      int count = 0;
+
+      Iterator<SumPoint> iter = list.iterator();
+      SumPoint first = iter.next();
+      boolean conditionMet = false;
+
+      // now sum up the preceeding points
+      while (iter.hasNext()) {
+        SumPoint next = iter.next();
+        result += (Double) next.val;
+        count++;
+        if (!isTimeUnit && count >= numPoints) {
+          conditionMet = true;
+          break;
+        } else if (isTimeUnit && ((first.ts - next.ts) > numPoints)) {
+          conditionMet = true;
+          break;
+        }
+      }
+
+      if (!conditionMet || count == 0) {
+        return 0;
+      }
+
+      return result / count;
+    }
+
+    class SumPoint {
+      long ts;
+      Object val;
+
+      public SumPoint(long ts, Object val) {
+        this.ts = ts;
+        this.val = val;
+      }
+    }
+  }
+  public static class MaxCacheAggregator implements MaxAggregator {
+
+    private final Interpolation method;
+    private final String name;
+    private final int size;
+    private final long[] maxLongs;
+    private final double[] maxDoubles;
+    private boolean hasLongs = false;
+    private boolean hasDoubles = false;
+
+    private long start;
+    private long end;
+
+    public MaxCacheAggregator(Interpolation method, String name, int size,
+                              long startTimeInMillis, long endTimeInMillis) {
+      this.method = method;
+      this.name = name;
+      this.size = size;
+      this.start = startTimeInMillis;
+      this.end = endTimeInMillis;
+
+      this.maxLongs = new long[size];
+      this.maxDoubles = new double[size];
+
+      for (int i = 0; i < size; i++) {
+        maxDoubles[i] = Double.MIN_VALUE;
+        maxLongs[i] = Long.MIN_VALUE;
+      }
+    }
+
+    @Override
+    public long runLong(Longs values) {
+      if (values instanceof DataPoint) {
+        long ts = ((DataPoint) values).timestamp();
+        //data point falls outside required range
+        if (ts < start || ts > end) {
+          return 0;
+        }
+      }
+
+      long[] longs = new long[size];
+      int ix = 0;
+      longs[ix++] = values.nextLongValue();
+      while (values.hasNextValue()) {
+        longs[ix++] = values.nextLongValue();
+      }
+
+      for (int i = 0; i < size; i++) {
+        maxLongs[i] = Math.max(maxLongs[i], longs[i]);
+      }
+
+      hasLongs = true;
+      return 0;
+    }
+
+    @Override
+    public double runDouble(Doubles values) {
+      if (values instanceof DataPoint) {
+        long ts = ((DataPoint) values).timestamp();
+        //data point falls outside required range
+        if (ts < start || ts > end) {
+          return 0;
+        }
+      }
+
+      double[] doubles = new double[size];
+      int ix = 0;
+      doubles[ix++] = values.nextDoubleValue();
+      while (values.hasNextValue()) {
+        doubles[ix++] = values.nextDoubleValue();
+      }
+      for (int i = 0; i < size; i++) {
+        maxDoubles[i] = Math.max(maxDoubles[i], doubles[i]);
+      }
+
+      hasDoubles = true;
+      return 0;
+    }
+
+    public long[] getLongMaxes() {
+      return maxLongs;
+    }
+
+    public double[] getDoubleMaxes() {
+      return maxDoubles;
+    }
+
+    public boolean hasLongs() {
+      return hasLongs;
+    }
+
+    public boolean hasDoubles() {
+      return hasDoubles;
+    }
+  }
+  public static class MaxLatestAggregator implements MaxAggregator {
+
+    private final Interpolation method;
+    private final String name;
+    private final int size;
+    private final long[] maxLongs;
+    private final double[] maxDoubles;
+    private final long start;
+    private final long end;
+    private boolean hasLongs = false;
+    private boolean hasDoubles = false;
+    private long latestTS = -1;
+
+    public MaxLatestAggregator(Interpolation method, String name, int size,
+                               long startTimeInMillis, long endTimeInMillis) {
+      this.method = method;
+      this.name = name;
+      this.size = size;
+      this.start = startTimeInMillis;
+      this.end = endTimeInMillis;
+
+
+      this.maxLongs = new long[size];
+      this.maxDoubles = new double[size];
+
+      for (int i = 0; i < size; i++) {
+        maxDoubles[i] = Double.MIN_VALUE;
+        maxLongs[i] = Long.MIN_VALUE;
+      }
+    }
+
+    @Override
+    public long runLong(Longs values) {
+      if (values instanceof DataPoint) {
+        long ts = ((DataPoint) values).timestamp();
+        //data point falls outside required range
+        if (ts < start || ts > end) {
+          return 0;
+        }
+      }
+
+      long[] longs = new long[size];
+      int ix = 0;
+      longs[ix++] = values.nextLongValue();
+      while (values.hasNextValue()) {
+        longs[ix++] = values.nextLongValue();
+      }
+
+      if (values instanceof DataPoint) {
+        long ts = ((DataPoint) values).timestamp();
+        if (ts > latestTS) {
+          System.arraycopy(longs, 0, maxLongs, 0, size);
+        }
+      }
+
+      hasLongs = true;
+      return 0;
+    }
+
+    @Override
+    public double runDouble(Doubles values) {
+      if (values instanceof DataPoint) {
+        long ts = ((DataPoint) values).timestamp();
+        //data point falls outside required range
+        if (ts < start || ts > end) {
+          return 0;
+        }
+      }
+
+      double[] doubles = new double[size];
+      int ix = 0;
+      doubles[ix++] = values.nextDoubleValue();
+      while (values.hasNextValue()) {
+        doubles[ix++] = values.nextDoubleValue();
+      }
+
+      if (values instanceof DataPoint) {
+        long ts = ((DataPoint) values).timestamp();
+        if (ts > latestTS) {
+          System.arraycopy(doubles, 0, maxDoubles, 0, size);
+        }
+      }
+
+      hasDoubles = true;
+      return 0;
+    }
+
+    public long[] getLongMaxes() {
+      return maxLongs;
+    }
+
+    public double[] getDoubleMaxes() {
+      return maxDoubles;
+    }
+
+    public boolean hasLongs() {
+      return hasLongs;
+    }
+
+    public boolean hasDoubles() {
+      return hasDoubles;
+    }
   }
 
 }
